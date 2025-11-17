@@ -474,11 +474,16 @@
         // Variables del juego (mantenidas exactas)
         let score = 0;
         let keys = {};
+        // Variables para el control de jets
         let waterParticles = [];
         let rings = [];
         let poles = [];
         let leftJetActive = false;
         let rightJetActive = false;
+        let leftJetCooldown = false;  // Nuevo: sistema de cooldown
+        let rightJetCooldown = false; // Nuevo: sistema de cooldown
+        let jetDuration = 500;        // Duración del chorro en milisegundos
+        let jetCooldownTime = 200;    // Tiempo de cooldown en milisegundos
         let leftResidual = { strength: 0, x: 0, y: CANVAS_HEIGHT };
         let rightResidual = { strength: 0, x: CANVAS_WIDTH, y: CANVAS_HEIGHT };
         
@@ -2344,18 +2349,16 @@
 
             const prevLeftActive = leftJetActive;
             const prevRightActive = rightJetActive;
-            leftJetActive = keys['f'] || keys['F'];
-            rightJetActive = keys['j'] || keys['J'];
+            // *** REMOVER CONTROL POR TECLAS - AHORA SE CONTROLA DIRECTAMENTE ***
+            // leftJetActive y rightJetActive se controlan directamente en activateJet()
 
-            // Debug: mostrar estado de las teclas cada segundo
+            // Debug: mostrar estado de los jets cada segundo
             if (currentTime % 1000 < 16.67) {
-                console.log('Estado de teclas:', {
-                    'j': keys['j'],
-                    'J': keys['J'], 
-                    'f': keys['f'],
-                    'F': keys['F'],
+                console.log('Estado de jets:', {
                     leftJetActive,
-                    rightJetActive
+                    rightJetActive,
+                    leftJetCooldown,
+                    rightJetCooldown
                 });
             }
 
@@ -2444,152 +2447,169 @@
             requestAnimationFrame(gameLoop);
         }
 
-        // Event listeners para teclado (PC)
+        // *** VARIABLES PARA RASTREO DE TECLAS PRESIONADAS ***
+        let keysPressed = new Set();
+
+        // Event listeners para teclado (PC) - SISTEMA ACTUALIZADO
         document.addEventListener('keydown', (e) => {
             console.log(`Tecla presionada: "${e.key}"`);
-            keys[e.key] = true;
+            
             // Prevenir comportamiento por defecto para F y J
             if (e.key.toLowerCase() === 'f' || e.key.toLowerCase() === 'j') {
                 e.preventDefault();
+                
+                // Solo activar si la tecla no estaba ya presionada (evitar repetición)
+                if (!keysPressed.has(e.key.toLowerCase())) {
+                    keysPressed.add(e.key.toLowerCase());
+                    
+                    if (e.key.toLowerCase() === 'f' && !leftJetCooldown) {
+                        // Buscar el botón correspondiente para feedback visual
+                        const leftButton = document.querySelector('[data-key="f"]');
+                        activateJet('left', leftButton);
+                    } else if (e.key.toLowerCase() === 'j' && !rightJetCooldown) {
+                        // Buscar el botón correspondiente para feedback visual
+                        const rightButton = document.querySelector('[data-key="j"]');
+                        activateJet('right', rightButton);
+                    }
+                }
             }
+            
+            // Mantener el sistema legacy de teclas para otros usos
+            keys[e.key] = true;
         });
 
         document.addEventListener('keyup', (e) => {
             console.log(`Tecla liberada: "${e.key}"`);
-            keys[e.key] = false;
+            
             // Prevenir comportamiento por defecto para F y J
             if (e.key.toLowerCase() === 'f' || e.key.toLowerCase() === 'j') {
                 e.preventDefault();
+                
+                // Remover del conjunto de teclas presionadas
+                keysPressed.delete(e.key.toLowerCase());
             }
+            
+            // Mantener el sistema legacy de teclas para otros usos
+            keys[e.key] = false;
         });
+
+        // *** FUNCIÓN GLOBAL PARA ACTIVAR JETS TEMPORALMENTE ***
+        
+        // Función para activar un jet temporalmente
+        function activateJet(side, button = null) {
+            // Verificar si el jet está en cooldown
+            if ((side === 'left' && leftJetCooldown) || (side === 'right' && rightJetCooldown)) {
+                console.log(`Jet ${side} está en cooldown, ignorando activación`);
+                return;
+            }
+            
+            console.log(`Activando jet ${side} temporalmente`);
+            
+            // Activar el jet
+            if (side === 'left') {
+                leftJetActive = true;
+                leftJetCooldown = true;
+            } else {
+                rightJetActive = true;
+                rightJetCooldown = true;
+            }
+            
+            // Feedback visual inmediato
+            if (button) {
+                button.style.transform = 'translateY(2px) scale(0.95)';
+                button.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.6)';
+                button.classList.add('jet-active');
+            }
+            
+            // Desactivar el jet después de la duración especificada
+            setTimeout(() => {
+                if (side === 'left') {
+                    leftJetActive = false;
+                } else {
+                    rightJetActive = false;
+                }
+                
+                // Remover feedback visual
+                if (button) {
+                    button.style.transform = '';
+                    button.style.boxShadow = '';
+                    button.classList.remove('jet-active');
+                }
+                
+                console.log(`Jet ${side} desactivado`);
+            }, jetDuration);
+            
+            // Terminar el cooldown después del tiempo especificado
+            setTimeout(() => {
+                if (side === 'left') {
+                    leftJetCooldown = false;
+                } else {
+                    rightJetCooldown = false;
+                }
+                
+                console.log(`Cooldown del jet ${side} terminado`);
+            }, jetDuration + jetCooldownTime);
+        }
 
         // Event listeners para botones (móvil y PC)
         function setupButtonEvents() {
             console.log('Configurando eventos de botones...');
             
-            // Función para activar una tecla
+            // Función legacy para mantener compatibilidad con teclado
             function setKeyState(key, isPressed, button = null) {
+                // Para el nuevo sistema, solo activamos en el momento del press
+                if (isPressed && !keys[key]) { // Solo activar si no estaba ya presionado
+                    if ((key === 'f' || key === 'F') && !leftJetCooldown) {
+                        activateJet('left', button);
+                    } else if ((key === 'j' || key === 'J') && !rightJetCooldown) {
+                        activateJet('right', button);
+                    }
+                }
+                
+                // Mantener el estado de las teclas para otros usos potenciales
                 keys[key] = isPressed;
                 keys[key.toUpperCase()] = isPressed;
                 keys[key.toLowerCase()] = isPressed;
                 
-                // Feedback visual
-                if (button) {
-                    if (isPressed) {
-                        button.style.transform = 'translateY(2px) scale(0.95)';
-                        button.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.6)';
-                        button.classList.add('jet-active');
-                    } else {
-                        button.style.transform = '';
-                        button.style.boxShadow = '';
-                        button.classList.remove('jet-active');
-                    }
-                }
-                
                 console.log(`Tecla "${key}" establecida a: ${isPressed}`);
             }
 
-            // *** CONFIGURACIÓN MEJORADA PARA MULTI-TOUCH EN iOS ***
+            // *** CONFIGURACIÓN SIMPLIFICADA PARA ACTIVACIÓN ÚNICA ***
             
-            // Botones móviles con manejo mejorado de multi-touch
+            // Botones móviles con activación por tap único
             const mobileButtons = document.querySelectorAll('.mobile-button');
             console.log('Botones móviles encontrados:', mobileButtons.length);
-            
-            // Array para rastrear toques activos
-            const activeTouches = new Map();
             
             mobileButtons.forEach((button, index) => {
                 const key = button.getAttribute('data-key');
                 console.log(`Configurando botón móvil ${index + 1}: tecla "${key}"`);
                 
-                // *** EVENTOS TÁCTILES MEJORADOS PARA MULTI-TOUCH ***
+                // *** EVENTO TÁCTIL ÚNICO PARA ACTIVACIÓN ***
                 button.addEventListener('touchstart', (e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     
-                    // Registrar todos los toques que comienzan en este botón
-                    for (let i = 0; i < e.changedTouches.length; i++) {
-                        const touch = e.changedTouches[i];
-                        activeTouches.set(touch.identifier, { button, key });
-                    }
+                    // Activar jet inmediatamente al tocar
+                    const side = key === 'f' ? 'left' : 'right';
+                    activateJet(side, button);
                     
-                    console.log(`Botón móvil touched: ${key}, toques activos:`, activeTouches.size);
-                    setKeyState(key, true, button);
+                    console.log(`Botón móvil activado: ${key} (${side})`);
                 }, { passive: false });
                 
+                // Prevenir otros eventos táctiles innecesarios
                 button.addEventListener('touchend', (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    
-                    // Remover toques que terminan
-                    let stillHasTouchOnThisButton = false;
-                    
-                    for (let i = 0; i < e.changedTouches.length; i++) {
-                        const touch = e.changedTouches[i];
-                        activeTouches.delete(touch.identifier);
-                    }
-                    
-                    // Verificar si todavía hay toques activos en este botón
-                    activeTouches.forEach((touchInfo) => {
-                        if (touchInfo.button === button) {
-                            stillHasTouchOnThisButton = true;
-                        }
-                    });
-                    
-                    if (!stillHasTouchOnThisButton) {
-                        console.log(`Botón móvil release: ${key}, toques activos:`, activeTouches.size);
-                        setKeyState(key, false, button);
-                    }
                 }, { passive: false });
                 
                 button.addEventListener('touchcancel', (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    
-                    // Limpiar toques cancelados
-                    for (let i = 0; i < e.changedTouches.length; i++) {
-                        const touch = e.changedTouches[i];
-                        activeTouches.delete(touch.identifier);
-                    }
-                    
-                    console.log(`Botón móvil cancelled: ${key}, toques activos:`, activeTouches.size);
-                    setKeyState(key, false, button);
                 }, { passive: false });
                 
-                // Manejar toques que se mueven fuera del botón
                 button.addEventListener('touchmove', (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    
-                    // Verificar si algún toque se movió fuera del botón
-                    for (let i = 0; i < e.changedTouches.length; i++) {
-                        const touch = e.changedTouches[i];
-                        const touchInfo = activeTouches.get(touch.identifier);
-                        
-                        if (touchInfo && touchInfo.button === button) {
-                            const rect = button.getBoundingClientRect();
-                            const x = touch.clientX;
-                            const y = touch.clientY;
-                            
-                            // Si el toque está fuera del botón, considerarlo como liberado
-                            if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
-                                activeTouches.delete(touch.identifier);
-                                
-                                // Verificar si todavía hay otros toques en este botón
-                                let stillHasTouchOnThisButton = false;
-                                activeTouches.forEach((ti) => {
-                                    if (ti.button === button) {
-                                        stillHasTouchOnThisButton = true;
-                                    }
-                                });
-                                
-                                if (!stillHasTouchOnThisButton) {
-                                    console.log(`Toque salió del botón móvil: ${key}`);
-                                    setKeyState(key, false, button);
-                                }
-                            }
-                        }
-                    }
                 }, { passive: false });
                 
                 // Prevenir arrastre y selección
@@ -2602,7 +2622,7 @@
                 });
             });
 
-            // Botones de PC (sin cambios)
+            // Botones de PC con activación única por clic
             const desktopButtons = document.querySelectorAll('.desktop-left, .desktop-right');
             console.log('Botones de PC encontrados:', desktopButtons.length);
             
@@ -2610,21 +2630,36 @@
                 const key = button.getAttribute('data-key') || button.textContent.trim().toLowerCase();
                 console.log(`Configurando botón PC ${index + 1}: tecla "${key}"`);
                 
+                // *** EVENTO DE CLIC ÚNICO PARA ACTIVACIÓN ***
+                button.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    console.log(`Botón PC clickeado: ${key}`);
+                    
+                    // Activar jet inmediatamente al hacer clic
+                    const side = key === 'f' ? 'left' : 'right';
+                    activateJet(side, button);
+                });
+                
+                // Mantener feedback visual básico para mousedown/up (sin activar jets)
                 button.addEventListener('mousedown', (e) => {
                     e.preventDefault();
-                    console.log(`Botón PC presionado: ${key}`);
-                    setKeyState(key, true, button);
+                    // Solo feedback visual, sin activar jets
+                    button.style.transform = 'translateY(1px) scale(0.98)';
                 });
                 
                 button.addEventListener('mouseup', (e) => {
                     e.preventDefault();
-                    console.log(`Botón PC liberado: ${key}`);
-                    setKeyState(key, false, button);
+                    // Restaurar solo si no hay jet activo
+                    if ((key === 'f' && !leftJetActive) || (key === 'j' && !rightJetActive)) {
+                        button.style.transform = '';
+                    }
                 });
                 
                 button.addEventListener('mouseleave', (e) => {
-                    console.log(`Mouse salió del botón PC: ${key}`);
-                    setKeyState(key, false, button);
+                    // Restaurar solo si no hay jet activo
+                    if ((key === 'f' && !leftJetActive) || (key === 'j' && !rightJetActive)) {
+                        button.style.transform = '';
+                    }
                 });
 
                 // Prevenir arrastre
