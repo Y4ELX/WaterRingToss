@@ -8,7 +8,7 @@
         body {
             margin: 0;
             padding: 0;
-            background: linear-gradient(180deg, #87CEEB 0%, #4682B4 100%);
+            background: linear-gradient(180deg, #3390b5 0%, #164469 100%);
             font-family: 'Arial', sans-serif;
             display: flex;
             flex-direction: column;
@@ -329,12 +329,26 @@
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
         }
 
+        /* Estado activo para los jets */
+        .frutiger-aero-button.jet-active {
+            background: 
+                radial-gradient(farthest-corner at bottom center, rgba(0, 255, 255, 0.8), transparent),
+                linear-gradient(to bottom, oklch(45% var(--sat) var(--hue) / 0.75), oklch(75% var(--sat) var(--hue) / 0.8));
+            box-shadow: 0 4px 12px rgba(0, 255, 255, 0.4);
+            animation: pulse-glow 0.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes pulse-glow {
+            from { box-shadow: 0 4px 12px rgba(0, 255, 255, 0.4); }
+            to { box-shadow: 0 6px 18px rgba(0, 255, 255, 0.7); }
+        }
+
     </style>
 </head>
 <body>
     <div class="mainContainer">
         <!-- Botón izquierdo para PC -->
-        <button class="frutiger-aero-button desktop-left">
+        <button class="frutiger-aero-button desktop-left" data-key="s">
             S
         </button>
 
@@ -352,7 +366,7 @@
         </div>
 
         <!-- Botón derecho para PC -->
-        <button class="frutiger-aero-button desktop-right">
+        <button class="frutiger-aero-button desktop-right" data-key="l">
             L
         </button>
 
@@ -2262,6 +2276,18 @@
             leftJetActive = keys['s'] || keys['S'];
             rightJetActive = keys['l'] || keys['L'];
 
+            // Debug: mostrar estado de las teclas cada segundo
+            if (currentTime % 1000 < 16.67) {
+                console.log('Estado de teclas:', {
+                    's': keys['s'],
+                    'S': keys['S'], 
+                    'l': keys['l'],
+                    'L': keys['L'],
+                    leftJetActive,
+                    rightJetActive
+                });
+            }
+
             // Actualizar efectos de boquillas
             jetNozzles[0].material.emissive.setHex(leftJetActive ? 0x00FFFF : 0x000000);
             jetNozzles[1].material.emissive.setHex(rightJetActive ? 0x00FFFF : 0x000000);
@@ -2331,86 +2357,132 @@
 
         // Event listeners para teclado (PC)
         document.addEventListener('keydown', (e) => {
+            console.log(`Tecla presionada: "${e.key}"`);
             keys[e.key] = true;
+            // Prevenir comportamiento por defecto para S y L
+            if (e.key.toLowerCase() === 's' || e.key.toLowerCase() === 'l') {
+                e.preventDefault();
+            }
         });
 
         document.addEventListener('keyup', (e) => {
+            console.log(`Tecla liberada: "${e.key}"`);
             keys[e.key] = false;
+            // Prevenir comportamiento por defecto para S y L
+            if (e.key.toLowerCase() === 's' || e.key.toLowerCase() === 'l') {
+                e.preventDefault();
+            }
         });
 
         // Event listeners para botones (móvil y PC)
         function setupButtonEvents() {
+            console.log('Configurando eventos de botones...');
+            
+            // Función para activar una tecla
+            function setKeyState(key, isPressed, button = null) {
+                keys[key] = isPressed;
+                keys[key.toUpperCase()] = isPressed;
+                keys[key.toLowerCase()] = isPressed;
+                
+                // Feedback visual
+                if (button) {
+                    if (isPressed) {
+                        button.style.transform = 'translateY(2px) scale(0.95)';
+                        button.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.6)';
+                        button.classList.add('jet-active');
+                    } else {
+                        button.style.transform = '';
+                        button.style.boxShadow = '';
+                        button.classList.remove('jet-active');
+                    }
+                }
+                
+                console.log(`Tecla "${key}" establecida a: ${isPressed}`);
+            }
+
             // Botones de PC
             const desktopButtons = document.querySelectorAll('.desktop-left, .desktop-right');
-            desktopButtons.forEach(button => {
-                const key = button.textContent.trim().toLowerCase();
+            console.log('Botones de PC encontrados:', desktopButtons.length);
+            
+            desktopButtons.forEach((button, index) => {
+                const key = button.getAttribute('data-key') || button.textContent.trim().toLowerCase();
+                console.log(`Configurando botón PC ${index + 1}: tecla "${key}"`);
                 
                 button.addEventListener('mousedown', (e) => {
                     e.preventDefault();
-                    keys[key] = true;
-                    keys[key.toUpperCase()] = true;
+                    console.log(`Botón PC presionado: ${key}`);
+                    setKeyState(key, true, button);
                 });
                 
                 button.addEventListener('mouseup', (e) => {
                     e.preventDefault();
-                    keys[key] = false;
-                    keys[key.toUpperCase()] = false;
+                    console.log(`Botón PC liberado: ${key}`);
+                    setKeyState(key, false, button);
                 });
                 
                 button.addEventListener('mouseleave', (e) => {
-                    keys[key] = false;
-                    keys[key.toUpperCase()] = false;
+                    console.log(`Mouse salió del botón PC: ${key}`);
+                    setKeyState(key, false, button);
+                });
+
+                // Prevenir arrastre
+                button.addEventListener('dragstart', (e) => {
+                    e.preventDefault();
                 });
             });
 
             // Botones móviles
             const mobileButtons = document.querySelectorAll('.mobile-button');
-            mobileButtons.forEach(button => {
+            console.log('Botones móviles encontrados:', mobileButtons.length);
+            
+            mobileButtons.forEach((button, index) => {
                 const key = button.getAttribute('data-key');
+                console.log(`Configurando botón móvil ${index + 1}: tecla "${key}"`);
                 
                 // Touch events para móvil
                 button.addEventListener('touchstart', (e) => {
                     e.preventDefault();
-                    keys[key] = true;
-                    keys[key.toUpperCase()] = true;
-                    button.style.transform = 'translateY(2px) scale(0.95)';
+                    console.log(`Botón móvil touched: ${key}`);
+                    setKeyState(key, true, button);
                 });
                 
                 button.addEventListener('touchend', (e) => {
                     e.preventDefault();
-                    keys[key] = false;
-                    keys[key.toUpperCase()] = false;
-                    button.style.transform = '';
+                    console.log(`Botón móvil release: ${key}`);
+                    setKeyState(key, false, button);
                 });
                 
                 button.addEventListener('touchcancel', (e) => {
                     e.preventDefault();
-                    keys[key] = false;
-                    keys[key.toUpperCase()] = false;
-                    button.style.transform = '';
+                    console.log(`Botón móvil cancelled: ${key}`);
+                    setKeyState(key, false, button);
                 });
                 
                 // Mouse events como fallback
                 button.addEventListener('mousedown', (e) => {
                     e.preventDefault();
-                    keys[key] = true;
-                    keys[key.toUpperCase()] = true;
-                    button.style.transform = 'translateY(2px) scale(0.95)';
+                    console.log(`Botón móvil mouse down: ${key}`);
+                    setKeyState(key, true, button);
                 });
                 
                 button.addEventListener('mouseup', (e) => {
                     e.preventDefault();
-                    keys[key] = false;
-                    keys[key.toUpperCase()] = false;
-                    button.style.transform = '';
+                    console.log(`Botón móvil mouse up: ${key}`);
+                    setKeyState(key, false, button);
                 });
                 
                 button.addEventListener('mouseleave', (e) => {
-                    keys[key] = false;
-                    keys[key.toUpperCase()] = false;
-                    button.style.transform = '';
+                    console.log(`Mouse salió del botón móvil: ${key}`);
+                    setKeyState(key, false, button);
+                });
+
+                // Prevenir arrastre
+                button.addEventListener('dragstart', (e) => {
+                    e.preventDefault();
                 });
             });
+            
+            console.log('Configuración de botones completada');
         }
 
         // Agregar nuevos aros periódicamente (máximo 10 aros totales)
