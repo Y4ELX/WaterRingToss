@@ -1,0 +1,2439 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Water Ring Toss 3D</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(180deg, #87CEEB 0%, #4682B4 100%);
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            overflow-x: auto;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin: 10px 0;
+            text-align: center;
+            background: linear-gradient(45deg, #FF6B6B, #4ECDC4, #FFE66D);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: rainbow 3s ease-in-out infinite alternate;
+        }
+
+        @keyframes rainbow {
+            0% { filter: hue-rotate(0deg); }
+            100% { filter: hue-rotate(360deg); }
+        }
+
+        #gameContainer {
+            border: 4px solid #fff;
+            border-radius: 10px;
+            background: #000;
+            overflow: hidden;
+            z-index: 100;
+            max-width: 100vw;
+            max-height: 80vh;
+        }
+
+        .controls {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 1.2em;
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+
+        .score {
+            margin-top: 10px;
+            font-size: 1.5em;
+            font-weight: bold;
+            text-align: center;
+            background: rgba(255,255,255,0.2);
+            padding: 10px;
+            border-radius: 8px;
+            min-width: 200px;
+        }
+
+        .key {
+            display: inline-block;
+            background: #FF6B6B;
+            color: white;
+            padding: 5px 10px;
+            margin: 0 5px;
+            border-radius: 5px;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .debug-info {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            font-family: monospace;
+        }
+
+        /* Contenedor principal - responsive */
+        .mainContainer {
+            width: 100%;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+
+        /* Ocultar controles móviles en PC */
+        .mobile-controls {
+            display: none;
+        }
+
+        /* Layout para PC - horizontal */
+        @media (min-width: 768px) {
+            .mainContainer {
+                flex-direction: row;
+                justify-content: space-around;
+                gap: 20px;
+            }
+
+            .desktop-left,
+            .desktop-right {
+                display: flex;
+            }
+
+            .mobile-controls {
+                display: none;
+            }
+        }
+
+        /* Layout para móvil - vertical */
+        @media (max-width: 767px) {
+            .mainContainer {
+                flex-direction: column;
+                justify-content: center;
+                gap: 15px;
+                padding: 15px;
+            }
+
+            /* Ocultar botones de PC en móvil */
+            .desktop-left,
+            .desktop-right {
+                display: none !important;
+            }
+
+            /* Mostrar contenedor para botones en móvil */
+            .mobile-controls {
+                width: 100%;
+                height: 200px;
+                display: flex !important;
+                flex-direction: row;
+                gap: 20px;
+                justify-content: center;
+                align-items: center;
+                order: 2; /* Los botones van después del canvas */
+            }
+
+            #gameContainer {
+                order: 1; /* El canvas va primero */
+                width: 100% !important;
+                height: auto !important;
+                max-width: 95vw;
+                max-height: 60vh;
+            }
+
+            #gameContainer canvas {
+                width: 100% !important;
+                height: auto !important;
+            }
+
+            #waterOverlay {
+                width: 100% !important;
+                height: auto !important;
+            }
+        }
+
+        .frutiger-aero-button {
+            /* OKLCH Color System for accurate colors */
+            --hue: 245;
+            --sat: 0.2;
+            --glow-intensity: 0.7;
+            
+            /* Color Variables */
+            --fg: oklch(15% calc(var(--sat) * 0.5) var(--hue));
+            --bg: oklch(75% var(--sat) var(--hue) / 0.8);
+            --bg-dark: oklch(45% var(--sat) var(--hue) / 0.75);
+            --bottom-glow: radial-gradient(
+                farthest-corner at bottom center,
+                rgba(255, 255, 255, var(--glow-intensity)),
+                transparent
+            );
+            
+            /* Base Styling */
+            background-color: var(--bg);
+            background: 
+                var(--bottom-glow),
+                linear-gradient(to bottom, var(--bg-dark), var(--bg));
+            
+            border: 1px solid var(--bg);
+            border-radius: 50%;
+            
+            /* Shadows and Effects */
+            box-shadow: 0 4px 4px rgba(0, 0, 0, 0.4);
+            
+            /* Typography */
+            color: white;
+            font-family: "Lucida Grande", "Lucida Sans Unicode", "Segoe UI", system-ui, sans-serif;
+            font-weight: 700;
+            text-shadow: 0 2px 0.5em rgba(0, 0, 0, 0.2);
+            
+            /* Layout */
+            cursor: pointer;
+            position: relative;
+            transition: all 300ms ease;
+            
+            /* Prevent text selection */
+            user-select: none;
+            -webkit-user-select: none;
+            
+            /* Flexible size */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Tamaños responsive para botones */
+        @media (min-width: 768px) {
+            .frutiger-aero-button {
+                width: 150px;
+                height: 150px;
+                font-size: 50px;
+            }
+        }
+
+        @media (max-width: 767px) {
+            .frutiger-aero-button {
+                width: 80px;
+                height: 80px;
+                font-size: 30px;
+                min-width: 80px; /* Evitar que se encoja demasiado */
+            }
+        }
+
+        /* Top Highlight Effect */
+        .frutiger-aero-button::after {
+            content: "";
+            position: absolute;
+            top: 4%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60%;
+            height: 40%;
+            background: linear-gradient(
+                to bottom,
+                rgba(255, 255, 255, 0.8),
+                rgba(255, 255, 255, 0.1)
+            );
+            opacity: 0.3;
+            border-radius: inherit;
+            transition: background 400ms ease;
+            pointer-events: none;
+        }
+
+        /* Hover State */
+        .frutiger-aero-button:hover,
+        .frutiger-aero-button:focus {
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.4);
+            transform: translateY(-1px);
+        }
+
+        /* Active State */
+        .frutiger-aero-button:active {
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+            transform: translateY(1px);
+        }
+
+        /* Canvas responsive */
+        #gameContainer canvas {
+            max-width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        /* Ajustes adicionales para pantallas muy pequeñas */
+        @media (max-width: 480px) {
+            .frutiger-aero-button {
+                width: 70px;
+                height: 70px;
+                font-size: 25px;
+            }
+
+            .mainContainer {
+                gap: 10px;
+                padding: 10px;
+            }
+
+            #gameContainer {
+                max-height: 50vh;
+            }
+
+            .mobile-controls {
+                gap: 50px;
+            }
+        }
+
+        /* Evitar zoom en inputs/botones en iOS */
+        .frutiger-aero-button {
+            font-size: 16px; /* Base font size para evitar zoom en iOS */
+            -webkit-text-size-adjust: 100%;
+        }
+
+        @media (min-width: 768px) {
+            .frutiger-aero-button {
+                font-size: 50px; /* Tamaño original en PC */
+            }
+        }
+
+        @media (max-width: 767px) {
+            .frutiger-aero-button {
+                font-size: 30px; /* Tamaño en móvil */
+            }
+        }
+
+        /* Mejoras para toques en móvil */
+        .mobile-button {
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        /* Indicador visual de botón presionado */
+        .frutiger-aero-button:active,
+        .frutiger-aero-button.pressed {
+            transform: translateY(2px) scale(0.95);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+        }
+
+    </style>
+</head>
+<body>
+    <div class="mainContainer">
+        <!-- Botón izquierdo para PC -->
+        <button class="frutiger-aero-button desktop-left">
+            S
+        </button>
+
+        <div id="gameContainer" style="position: relative; width: 800px; height: 600px; margin: 0">
+            <canvas id="waterOverlay" style="
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 800px;
+                height: 600px;
+                pointer-events: none;
+                z-index: 1000;
+                opacity: 0.3;
+            "></canvas>
+        </div>
+
+        <!-- Botón derecho para PC -->
+        <button class="frutiger-aero-button desktop-right">
+            L
+        </button>
+
+        <!-- Contenedor de botones para móvil -->
+        <div class="mobile-controls">
+            <button class="frutiger-aero-button mobile-button" data-key="s">
+                S
+            </button>
+            <button class="frutiger-aero-button mobile-button" data-key="l">
+                L
+            </button>
+        </div>
+    </div>
+
+    <!-- Actualización de Three.js desde un CDN confiable -->
+    <script src="https://cdn.jsdelivr.net/npm/three@latest/build/three.min.js"></script>
+    
+    <script>
+        // Referencias a elementos DOM
+        const gameContainer = document.getElementById('gameContainer');
+        const waterOverlay = document.getElementById('waterOverlay');
+        const waterCtx = waterOverlay.getContext('2d');
+
+        // Variables para el efecto de agua
+        let waterTime = 0;
+        let waterAnimationId;
+
+        // Configuración de Three.js
+        let scene, camera, renderer, world;
+        const CANVAS_WIDTH = 800;
+        const CANVAS_HEIGHT = 600;
+        const TANK_WIDTH = 800;
+        const TANK_HEIGHT = 600;
+        const TANK_DEPTH = 200; // Profundidad del tanque 3D
+        
+        // Objetos 3D
+        let rings3D = [];
+        let poles3D = [];
+        let waterParticlesSystem;
+        let tankMesh;
+        let waterSurface;
+        let jetNozzles = [];
+
+        // Configuración del juego (mantenida exacta del original)
+        const GRAVITY = 0.3;
+        const FRICTION = 0.7;
+        const BUOYANCY = 0.05;
+        const WATER_FORCE = 8;
+        const WATER_RADIUS = 80;
+        const RESIDUAL_FORCE = 3;
+        const RESIDUAL_RADIUS = 120;
+        const MAX_RINGS_PER_POLE = 5; // Límite máximo de aros por palo (2 palos × 5 = 10 aros totales)
+
+        // Parámetros del campo de corrientes (mantenidos exactos)
+        const GRID_COLS = 40;
+        const GRID_ROWS = 30;
+        const REACH = Math.sqrt(CANVAS_WIDTH * CANVAS_WIDTH + CANVAS_HEIGHT * CANVAS_HEIGHT) * 0.8;
+        const CONE_ANGLE = Math.PI / 9;
+        const INJECT_STRENGTH = 20;
+        const DECAY_TAU = 0.02;
+        const DIFFUSION_RATE = 0.15;
+        const MIN_RESIDUAL = 2;
+        const TURBULENCE_STRENGTH = 0.5;
+        const MAX_CURRENT_FORCE = 18;
+        const CENTRAL_UPFLOW_STRENGTH = 4;
+        const CENTRAL_UPFLOW_RADIUS = 270;
+
+        // Parámetros de viscosidad del agua (mantenidos exactos)
+        const WATER = {
+            dragLinear: 0.15,
+            dragQuadratic: 0.03,
+            viscosity: 0.08,
+            inertia: 0.70,
+            floatForce: 0.005,
+            brakeFactor: 0.90,
+            maxFloatSpeed: 1.0
+        };
+
+        // Variables del juego (mantenidas exactas)
+        let score = 0;
+        let keys = {};
+        let waterParticles = [];
+        let rings = [];
+        let poles = [];
+        let leftJetActive = false;
+        let rightJetActive = false;
+        let leftResidual = { strength: 0, x: 0, y: CANVAS_HEIGHT };
+        let rightResidual = { strength: 0, x: CANVAS_WIDTH, y: CANVAS_HEIGHT };
+        
+        // Campo de velocidad 2D (mantenido exacto)
+        let velocityField = [];
+        let previousVelocityField = [];
+        let lastActivationTime = { left: 0, right: 0 };
+        let currentTime = 0;
+
+        // Inicializar Three.js
+        function initThreeJS() {
+            // Crear escena
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x4682B4);
+
+            // Configurar cámara (vista frontal fija)
+            camera = new THREE.PerspectiveCamera(45, CANVAS_WIDTH / CANVAS_HEIGHT, 1, 2000);
+            camera.position.set(0, 0, 700); // Vista frontal desde adelante
+            camera.lookAt(0, 0, 0);
+
+            // Configurar renderer con mejoras visuales
+            renderer = new THREE.WebGLRenderer({ 
+                antialias: true, 
+                alpha: true,
+                powerPreference: "high-performance" // Usar GPU dedicada si está disponible
+            });
+            renderer.setSize(CANVAS_WIDTH, CANVAS_HEIGHT);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.setClearColor(0x4682B4, 1);
+            
+            // *** MEJORAS DE CALIDAD VISUAL ***
+            renderer.toneMapping = THREE.ACESFilmicToneMapping; // Mejor mapeo de tonos
+            renderer.toneMappingExposure = 1.2; // Incrementar exposición para más brillo
+            renderer.outputEncoding = THREE.sRGBEncoding; // Mejor codificación de color
+            renderer.physicallyCorrectLights = true; // Iluminación físicamente correcta
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Mejor resolución en pantallas retina
+            
+            gameContainer.appendChild(renderer.domElement);
+
+            // Configurar iluminación
+            setupLighting();
+
+            // Crear tanque 3D
+            createTank();
+
+            // Crear superficie de agua
+            createWaterSurface();
+
+            // Crear boquillas de chorros
+            createJetNozzles();
+
+            // *** INICIALIZAR EFECTO DE AGUA SUPERPUESTO ***
+            initWaterOverlay();
+        }
+
+        // *** EFECTO DE AGUA CON CANVAS 2D SUPERPUESTO ***
+        function initWaterOverlay() {
+            // Configurar canvas del overlay
+            waterOverlay.width = CANVAS_WIDTH;
+            waterOverlay.height = CANVAS_HEIGHT;
+            
+            // Iniciar animación del agua
+            animateWaterOverlay();
+        }
+
+        function animateWaterOverlay() {
+            waterTime += 0.03;
+            
+            // Limpiar canvas
+            waterCtx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+            
+            // *** FONDO AZUL TRANSLÚCIDO PARA EFECTO BASE ***
+            waterCtx.fillStyle = 'rgba(0, 100, 180, 0.15)';
+            waterCtx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+            
+            // *** ONDAS AZULES MÁS INTENSAS ***
+            for (let layer = 0; layer < 4; layer++) {
+                waterCtx.save();
+                
+                // Configurar color y transparencia por capa (más intenso)
+                const alpha = 0.25 - (layer * 0.04);
+                const hue = 200 + (layer * 15);
+                waterCtx.fillStyle = `hsla(${hue}, 80%, 50%, ${alpha})`;
+                
+                waterCtx.beginPath();
+                
+                // Crear ondas senoidales más pronunciadas
+                for (let x = 0; x <= CANVAS_WIDTH; x += 1) {
+                    const wave1 = Math.sin((x * 0.008) + (waterTime * (1.5 + layer * 0.3))) * 25;
+                    const wave2 = Math.cos((x * 0.006) + (waterTime * (1.1 + layer * 0.2))) * 18;
+                    const wave3 = Math.sin((x * 0.012) + (waterTime * (0.8 + layer * 0.1))) * 12;
+                    
+                    const y = (CANVAS_HEIGHT * 0.25) + wave1 + wave2 + wave3;
+                    
+                    if (x === 0) {
+                        waterCtx.moveTo(x, y);
+                    } else {
+                        waterCtx.lineTo(x, y);
+                    }
+                }
+                
+                // Completar la forma hasta el fondo
+                waterCtx.lineTo(CANVAS_WIDTH, CANVAS_HEIGHT);
+                waterCtx.lineTo(0, CANVAS_HEIGHT);
+                waterCtx.closePath();
+                waterCtx.fill();
+                
+                waterCtx.restore();
+            }
+            
+            // *** BURBUJAS MÁS VISIBLES ***
+            for (let i = 0; i < 20; i++) {
+                const x = (Math.sin(waterTime * 0.5 + i) * 300) + (CANVAS_WIDTH / 2);
+                const y = (Math.cos(waterTime * 0.7 + i * 1.2) * 200) + (CANVAS_HEIGHT * 0.4);
+                const size = Math.sin(waterTime * 1.2 + i) * 8 + 12;
+                
+                waterCtx.save();
+                waterCtx.globalAlpha = 0.3;
+                
+                // Burbuja con borde
+                waterCtx.fillStyle = 'rgba(135, 206, 235, 0.4)';
+                waterCtx.beginPath();
+                waterCtx.arc(x, y, size, 0, Math.PI * 2);
+                waterCtx.fill();
+                
+                waterCtx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+                waterCtx.lineWidth = 1;
+                waterCtx.stroke();
+                
+                waterCtx.restore();
+            }
+            
+            // *** DISTORSIÓN VERTICAL MÁS VISIBLE ***
+            waterCtx.save();
+            waterCtx.globalAlpha = 0.15;
+            
+            for (let y = 0; y < CANVAS_HEIGHT; y += 8) {
+                const distortion = Math.sin(y * 0.03 + waterTime * 3) * 6;
+                const intensity = Math.abs(distortion) / 6;
+                
+                waterCtx.fillStyle = `rgba(0, 136, 204, ${intensity * 0.3})`;
+                waterCtx.fillRect(0, y, CANVAS_WIDTH, 4);
+            }
+            
+            waterCtx.restore();
+            
+            // *** LÍNEAS DE REFRACCIÓN HORIZONTAL ***
+            waterCtx.save();
+            waterCtx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            waterCtx.lineWidth = 1;
+            
+            for (let i = 0; i < 15; i++) {
+                const y = (i / 15) * CANVAS_HEIGHT;
+                const offset = Math.sin(y * 0.01 + waterTime * 2) * 20;
+                
+                waterCtx.beginPath();
+                waterCtx.moveTo(0, y + offset);
+                waterCtx.lineTo(CANVAS_WIDTH, y + offset);
+                waterCtx.stroke();
+            }
+            
+            waterCtx.restore();
+            
+            // Continuar animación
+            waterAnimationId = requestAnimationFrame(animateWaterOverlay);
+        }
+
+        function setupLighting() {
+            // *** ILUMINACIÓN MEJORADA PARA MEJOR VISIBILIDAD ***
+            
+            // Luz ambiental más intensa para iluminación base
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8); // Aumentado de 0.4 a 0.8
+            scene.add(ambientLight);
+
+            // Luz direccional principal más brillante
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2); // Aumentado de 0.8 a 1.2
+            directionalLight.position.set(200, 400, 300); // Posición más alta para mejor cobertura
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            directionalLight.shadow.camera.near = 1;
+            directionalLight.shadow.camera.far = 1200;
+            directionalLight.shadow.camera.left = -500;
+            directionalLight.shadow.camera.right = 500;
+            directionalLight.shadow.camera.top = 500;
+            directionalLight.shadow.camera.bottom = -500;
+            directionalLight.shadow.bias = -0.0001; // Reducir artifacts de sombra
+            scene.add(directionalLight);
+
+            // Luz de relleno mejorada
+            const fillLight = new THREE.DirectionalLight(0x87CEEB, 0.6); // Aumentado de 0.3 a 0.6
+            fillLight.position.set(-300, 200, 200);
+            scene.add(fillLight);
+
+            // *** NUEVAS LUCES ADICIONALES ***
+            
+            // Luz superior para iluminar desde arriba
+            const topLight = new THREE.DirectionalLight(0xffffff, 0.7);
+            topLight.position.set(0, 500, 0);
+            scene.add(topLight);
+
+            // Luces puntuales para acentuar objetos
+            const pointLight1 = new THREE.PointLight(0xffffff, 0.8, 800);
+            pointLight1.position.set(-200, 200, 300);
+            scene.add(pointLight1);
+
+            const pointLight2 = new THREE.PointLight(0xffffff, 0.8, 800);
+            pointLight2.position.set(200, 200, 300);
+            scene.add(pointLight2);
+
+            // Luz hemisférica para iluminación más natural
+            const hemisphereLight = new THREE.HemisphereLight(0x87CEEB, 0x4169E1, 0.5);
+            hemisphereLight.position.set(0, 300, 0);
+            scene.add(hemisphereLight);
+        }
+
+        function createTank() {
+            // Crear contenedor transparente del tanque
+            const tankGeometry = new THREE.BoxGeometry(TANK_WIDTH, TANK_HEIGHT, TANK_DEPTH);
+            const tankMaterial = new THREE.MeshPhysicalMaterial({
+                color: 0x87CEEB,
+                transparent: true,
+                opacity: 0.1,
+                side: THREE.BackSide,
+                roughness: 0.1,
+                metalness: 0.1
+            });
+            
+            tankMesh = new THREE.Mesh(tankGeometry, tankMaterial);
+            tankMesh.position.set(0, 0, 0);
+            scene.add(tankMesh);
+
+            // Crear paredes del tanque (invisibles pero con colisión)
+            const wallMaterial = new THREE.MeshBasicMaterial({ visible: false });
+            
+            // Paredes laterales
+            const leftWallGeom = new THREE.PlaneGeometry(TANK_HEIGHT, TANK_DEPTH);
+            const leftWall = new THREE.Mesh(leftWallGeom, wallMaterial);
+            leftWall.position.set(-TANK_WIDTH/2, 0, 0);
+            leftWall.rotation.y = Math.PI/2;
+            scene.add(leftWall);
+
+            const rightWall = new THREE.Mesh(leftWallGeom, wallMaterial);
+            rightWall.position.set(TANK_WIDTH/2, 0, 0);
+            rightWall.rotation.y = -Math.PI/2;
+            scene.add(rightWall);
+
+            // Piso del tanque
+            const floorGeom = new THREE.PlaneGeometry(TANK_WIDTH, TANK_DEPTH);
+            const floor = new THREE.Mesh(floorGeom, wallMaterial);
+            floor.position.set(0, TANK_HEIGHT/2, 0);
+            floor.rotation.x = -Math.PI/2;
+            scene.add(floor);
+        }
+
+        function createWaterSurface() {
+            // Crear superficie ondulada de agua (simplificada)
+            const waterGeometry = new THREE.PlaneGeometry(TANK_WIDTH, TANK_DEPTH, 32, 32);
+            const waterMaterial = new THREE.MeshPhysicalMaterial({
+                color: 0x006994,
+                transparent: true,
+                opacity: 0.6,
+                roughness: 0.1,
+                metalness: 0.1,
+                clearcoat: 1.0,
+                clearcoatRoughness: 0.1,
+                side: THREE.DoubleSide
+            });
+
+            waterSurface = new THREE.Mesh(waterGeometry, waterMaterial);
+            waterSurface.rotation.x = -Math.PI / 2;
+            waterSurface.position.y = TANK_HEIGHT / 3;
+            scene.add(waterSurface);
+
+            // Animar las ondas
+            const vertices = waterSurface.geometry.attributes.position;
+            waterSurface.userData = { 
+                originalVertices: vertices.array.slice(),
+                time: 0
+            };
+        }
+
+        function updateWaterSurface() {
+            if (!waterSurface.userData.originalVertices) return;
+            
+            waterSurface.userData.time += 0.02;
+            const time = waterSurface.userData.time;
+            
+            const vertices = waterSurface.geometry.attributes.position;
+            const originalVertices = waterSurface.userData.originalVertices;
+
+            for (let i = 0; i < vertices.count; i++) {
+                const x = originalVertices[i * 3];
+                const z = originalVertices[i * 3 + 2];
+                
+                // Ondas suaves usando ruido Perlin simplificado
+                const wave1 = Math.sin(x * 0.01 + time) * 2;
+                const wave2 = Math.cos(z * 0.01 + time * 1.5) * 1.5;
+                const wave3 = Math.sin((x + z) * 0.008 + time * 0.8) * 1;
+                
+                vertices.setY(i, wave1 + wave2 + wave3);
+            }
+            
+            vertices.needsUpdate = true;
+            waterSurface.geometry.computeVertexNormals();
+        }
+
+        function createJetNozzles() {
+            // Boquilla izquierda
+            const leftNozzleGeom = new THREE.CylinderGeometry(8, 15, 30, 8);
+            const nozzleMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x8B4513,
+                metalness: 0.3,
+                roughness: 0.7
+            });
+            
+            const leftNozzle = new THREE.Mesh(leftNozzleGeom, nozzleMaterial);
+            leftNozzle.position.set(-TANK_WIDTH/2 + 30, TANK_HEIGHT - 30, 0);
+            leftNozzle.rotation.z = -Math.PI/4;
+            leftNozzle.castShadow = true;
+            scene.add(leftNozzle);
+            jetNozzles.push(leftNozzle);
+
+            // Boquilla derecha
+            const rightNozzle = new THREE.Mesh(leftNozzleGeom, nozzleMaterial);
+            rightNozzle.position.set(TANK_WIDTH/2 - 30, TANK_HEIGHT - 30, 0);
+            rightNozzle.rotation.z = Math.PI/4;
+            rightNozzle.castShadow = true;
+            scene.add(rightNozzle);
+            jetNozzles.push(rightNozzle);
+        }
+
+        // Conversión de coordenadas 2D a 3D
+        function convert2DTo3D(x2d, y2d, z = 0) {
+            return {
+                x: x2d - CANVAS_WIDTH / 2,
+                y: -(y2d - CANVAS_HEIGHT / 2),
+                z: z
+            };
+        }
+
+        function convert3DTo2D(x3d, y3d) {
+            return {
+                x: x3d + CANVAS_WIDTH / 2,
+                y: -y3d + CANVAS_HEIGHT / 2
+            };
+        }
+
+        // Clase Ring modificada para 3D
+        class Ring {
+            constructor(x, y, color) {
+                // Propiedades físicas 2D (mantenidas exactas)
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * 2;
+                this.vy = 0;
+                this.prevVx = this.vx;
+                this.prevVy = this.vy;
+                this.color = color;
+                this.radius = 25;
+                this.thickness = 6;
+                this.onPole = false;
+                this.poleIndex = -1;
+                this.rotation = Math.random() * Math.PI * 2;
+                this.rotationSpeed = (Math.random() - 0.5) * 0.1;
+
+                // Propiedades 3D adicionales
+                this.z = 0; // Posición Z fija en el centro
+                this.vz = 0; // Sin velocidad en Z
+                this.rotationX = 0;
+                this.rotationY = 0;
+                this.rotationVelocityX = (Math.random() - 0.5) * 0.02;
+                this.rotationVelocityY = (Math.random() - 0.5) * 0.02;
+                this.rotationVelocityZ = (Math.random() - 0.5) * 0.02;
+
+                // *** LÍMITES DE VELOCIDAD DE ROTACIÓN ***
+                this.maxRotationVelocity = 0.15; // Velocidad máxima de rotación en radianes por frame
+
+                // *** PROPIEDADES PARA EL DESLIZAMIENTO POR EL PALO ***
+                this.slidingOnPole = false; // Indicador de deslizamiento
+                this.slideStartY = 0; // Y inicial cuando comienza a deslizar
+                this.slideVelocity = 0; // Velocidad de deslizamiento hacia abajo
+                this.slideTargetY = 0; // Y objetivo (base del palo)
+
+                this.createMesh();
+            }
+
+            // *** MÉTODO PARA LIMITAR VELOCIDADES DE ROTACIÓN ***
+            limitRotationVelocities() {
+                // Aplicar límites a cada eje de rotación
+                this.rotationVelocityX = Math.max(-this.maxRotationVelocity, 
+                                                 Math.min(this.maxRotationVelocity, this.rotationVelocityX));
+                this.rotationVelocityY = Math.max(-this.maxRotationVelocity, 
+                                                 Math.min(this.maxRotationVelocity, this.rotationVelocityY));
+                this.rotationVelocityZ = Math.max(-this.maxRotationVelocity, 
+                                                 Math.min(this.maxRotationVelocity, this.rotationVelocityZ));
+            }
+
+            createMesh() {
+                // Crear toro 3D
+                const torusGeometry = new THREE.TorusGeometry(this.radius, this.thickness, 8, 16);
+                const torusMaterial = new THREE.MeshStandardMaterial({
+                    color: this.color,
+                    metalness: 0.3, // Aumentado de 0.1 para más brillo metálico
+                    roughness: 0.4, // Reducido de 0.3 para superficies más reflectantes
+                    emissive: this.color,
+                    emissiveIntensity: 0.15, // Aumentado de 0.1 para más luminosidad propia
+                    envMapIntensity: 1.0, // Mejorar reflexiones ambientales
+                });
+
+                this.mesh = new THREE.Mesh(torusGeometry, torusMaterial);
+                this.mesh.castShadow = true;
+                this.mesh.receiveShadow = true;
+                
+                this.updateMeshPosition();
+                scene.add(this.mesh);
+                rings3D.push(this);
+            }
+
+            updateMeshPosition() {
+                if (!this.mesh) return;
+                
+                const pos3D = convert2DTo3D(this.x, this.y, this.z);
+                this.mesh.position.set(pos3D.x, pos3D.y, pos3D.z);
+                
+                // Aplicar rotaciones 3D reales
+                this.mesh.rotation.x = this.rotationX;
+                this.mesh.rotation.y = this.rotationY;
+                this.mesh.rotation.z = this.rotation;
+            }
+
+            update() {
+                if (this.onPole) {
+                    // *** MANTENER POSICIÓN CUANDO ESTÁ ENSARTADO ***
+                    // Los aros ensartados solo rotan lentamente, no se mueven
+                    this.rotationX += this.rotationVelocityX;
+                    this.rotationY += this.rotationVelocityY;
+                    this.rotationZ += this.rotationVelocityZ;
+                    
+                    // Damping de las rotaciones para que se estabilicen
+                    this.rotationVelocityX *= 0.995;
+                    this.rotationVelocityY *= 0.995;
+                    this.rotationVelocityZ *= 0.995;
+                    
+                    // *** MANTENER ORIENTACIÓN HORIZONTAL CUANDO ESTÁ ENSARTADO ***
+                    // Transición suave hacia horizontal SIN amortiguación (solo tendencia)
+                    const horizontalTransitionSpeed = 0.015; // Velocidad de convergencia suave
+                    const targetRotationX = -Math.PI / 2; // Posición horizontal
+                    const targetRotationY = 0;
+                    
+                    // Calcular diferencia angular más corta
+                    let diffX = targetRotationX - this.rotationX;
+                    if (diffX > Math.PI) diffX -= 2 * Math.PI;
+                    if (diffX < -Math.PI) diffX += 2 * Math.PI;
+                    
+                    let diffY = targetRotationY - this.rotationY;
+                    if (diffY > Math.PI) diffY -= 2 * Math.PI;
+                    if (diffY < -Math.PI) diffY += 2 * Math.PI;
+                    
+                    // Aplicar velocidad directa hacia el objetivo (sin resortes)
+                    this.rotationVelocityX = diffX * horizontalTransitionSpeed;
+                    this.rotationVelocityY = diffY * horizontalTransitionSpeed;
+                    
+                    this.updateMeshPosition();
+                    return;
+                }
+
+                // *** SI ESTÁ DESLIZANDO, MANEJAR DESLIZAMIENTO Y RETORNAR ***
+                if (this.slidingOnPole) {
+                    this.checkPoleCollision3D(); // Esto actualiza el deslizamiento
+                    this.rotation += this.rotationSpeed * 0.7;
+                    this.rotationSpeed *= 0.98;
+                    this.rotationX += this.rotationVelocityX;
+                    this.rotationY += this.rotationVelocityY;
+                    this.updateMeshPosition();
+                    return;
+                }
+
+                // *** MANTENER TODA LA FÍSICA ORIGINAL 2D EXACTA ***
+                this.prevVx = this.vx;
+                this.prevVy = this.vy;
+
+                this.vy += GRAVITY;
+                this.applyWaterBuoyancy();
+                this.applyWaterDrag();
+                this.vx *= 0.995;
+                this.vy *= 0.995;
+                this.applyDirectionChangeBraking();
+
+                this.x += this.vx;
+                this.y += this.vy;
+
+                this.rotation += this.rotationSpeed * 0.7;
+                this.rotationSpeed *= 0.98;
+
+                // *** ROTACIONES 3D PARA EFECTOS VISUALES ***
+                // Actualizar rotaciones 3D basadas en la velocidad
+                this.rotationVelocityX += (this.vy * 0.001);
+                this.rotationVelocityY += (this.vx * 0.001);
+                this.rotationVelocityX *= 0.98;
+                this.rotationVelocityY *= 0.98;
+
+                this.rotationX += this.rotationVelocityX;
+                this.rotationY += this.rotationVelocityY;
+
+                // *** TENDENCIA A HORIZONTAL CUANDO ESTÁ FLOTANDO ***
+                const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+                if (speed < 2) { // Si se está moviendo lentamente (flotando)
+                    // Aplicar suavemente orientación horizontal
+                    const horizontalForce = 0.012; // Aumentado para transición más rápida
+                    const maxHorizontalSpeed = 0.08; // Límite de velocidad
+                    const targetRotationX = -Math.PI / 2;
+                    
+                    let diffX = targetRotationX - this.rotationX;
+                    if (diffX > Math.PI) diffX -= 2 * Math.PI;
+                    if (diffX < -Math.PI) diffX += 2 * Math.PI;
+                    
+                    // Calcular velocidad deseada pero limitarla
+                    let desiredVelX = diffX * horizontalForce;
+                    let desiredVelY = -this.rotationY * horizontalForce;
+                    
+                    desiredVelX = Math.max(-maxHorizontalSpeed, Math.min(maxHorizontalSpeed, desiredVelX));
+                    desiredVelY = Math.max(-maxHorizontalSpeed, Math.min(maxHorizontalSpeed, desiredVelY));
+                    
+                    this.rotationVelocityX += desiredVelX;
+                    this.rotationVelocityY += desiredVelY;
+                }
+
+                // *** MANTENER Z BLOQUEADO ***
+                this.z = 0; // Siempre en el centro
+                this.vz = 0; // Sin velocidad en Z
+
+                // Colisiones 2D en un espacio 3D visual
+                const ringEffectiveRadius = this.radius + this.thickness;
+                
+                // Conversión a coordenadas del mundo 3D para las colisiones
+                const worldX = this.x - CANVAS_WIDTH/2;
+                
+                // Pared izquierda
+                if (worldX - ringEffectiveRadius < -TANK_WIDTH/2) {
+                    this.x = -TANK_WIDTH/2 + ringEffectiveRadius + CANVAS_WIDTH/2;
+                    this.vx = -this.vx * 0.4;
+                    this.rotationVelocityY = -this.rotationVelocityY;
+                    
+                    // *** TENDENCIA A HORIZONTAL AL TOCAR PAREDES ***
+                    this.setHorizontalPosition();
+                }
+                // Pared derecha
+                if (worldX + ringEffectiveRadius > TANK_WIDTH/2) {
+                    this.x = TANK_WIDTH/2 - ringEffectiveRadius + CANVAS_WIDTH/2;
+                    this.vx = -this.vx * 0.4;
+                    this.rotationVelocityY = -this.rotationVelocityY;
+                    
+                    // *** TENDENCIA A HORIZONTAL AL TOCAR PAREDES ***
+                    this.setHorizontalPosition();
+                }
+
+                // Piso del tanque
+                if (this.y + ringEffectiveRadius > CANVAS_HEIGHT) {
+                    this.y = CANVAS_HEIGHT - ringEffectiveRadius;
+                    this.vy = -this.vy * 0.2;
+                    this.vx *= 0.6;
+                    this.rotationVelocityX = -this.rotationVelocityX * 0.5;
+                    
+                    // *** POSICIÓN HORIZONTAL AL TOCAR EL FONDO ***
+                    this.setHorizontalPosition();
+                }
+
+                // Techo del tanque
+                if (this.y - ringEffectiveRadius < 0) {
+                    this.y = ringEffectiveRadius;
+                    this.vy = -this.vy * 0.3;
+                    
+                    // *** POSICIÓN HORIZONTAL AL TOCAR EL TECHO ***
+                    this.setHorizontalPosition();
+                }
+                
+                // Z siempre bloqueado en 0 (sin colisiones en profundidad)
+                this.z = 0;
+
+                this.applyCurrentField();
+                this.checkPoleCollision3D();
+                this.checkRingCollisions();
+                
+                // *** LIMITAR VELOCIDADES DE ROTACIÓN ***
+                this.limitRotationVelocities();
+                
+                this.updateMeshPosition();
+            }
+
+            checkPoleCollision3D() {
+                // *** SI YA ESTÁ DESLIZANDO, ACTUALIZAR DESLIZAMIENTO ***
+                if (this.slidingOnPole) {
+                    const pole = poles[this.poleIndex];
+                    
+                    // Mantener X y Z centrados en el eje del palo
+                    this.x = pole.x;
+                    // Mantener Z del deslizamiento (no resetear a 0)
+                    // this.z se mantiene como está
+                    
+                    // Aplicar gravedad durante el deslizamiento
+                    this.slideVelocity += GRAVITY * 0.5; // Gravedad reducida para deslizamiento suave
+                    this.slideVelocity *= 0.95; // Fricción del deslizamiento
+                    
+                    // Actualizar posición Y
+                    this.y += this.slideVelocity;
+                    
+                    // *** VERIFICAR COLISIÓN CON AROS APILADOS DURANTE EL DESLIZAMIENTO ***
+                    const stackedRings = rings.filter(ring => 
+                        ring.onPole && 
+                        ring.poleIndex === this.poleIndex && 
+                        ring !== this
+                    );
+                    
+                    // Si hay aros apilados, verificar si estamos cerca del más alto
+                    let shouldStopEarly = false;
+                    if (stackedRings.length > 0) {
+                        let highestRingY = Number.MAX_VALUE;
+                        for (let stackedRing of stackedRings) {
+                            if (stackedRing.y < highestRingY) {
+                                highestRingY = stackedRing.y;
+                            }
+                        }
+                        
+                        // Detener si estamos cerca del aro más alto
+                        const ringThickness = this.thickness;
+                        const stackGap = 3;
+                        const stopPosition = highestRingY - ringThickness - stackGap;
+                        
+                        if (this.y >= stopPosition) {
+                            this.y = stopPosition;
+                            shouldStopEarly = true;
+                        }
+                    }
+                    
+                    // Detener cuando llega a la base (Y objetivo) O cuando toca otro aro
+                    if (this.y >= this.slideTargetY || shouldStopEarly) {
+                        // *** CALCULAR POSICIÓN DE APILAMIENTO ***
+                        const stackPosition = this.calculateStackPosition(pole);
+                        
+                        this.y = stackPosition;
+                        this.slideVelocity = 0;
+                        this.onPole = true;
+                        this.vx = 0;
+                        this.vy = 0;
+                        this.vz = 0;
+                        
+                        // *** VARIACIÓN EN Z PARA EVITAR Z-FIGHTING ***
+                        // Cada aro apilado tiene una pequeña variación en Z
+                        const stackedRingsCount = stackedRings.length;
+                        this.z = (stackedRingsCount % 2 === 0) ? -0.5 : 0.5; // Alternando posición Z
+                        
+                        // Rotación lenta en la base
+                        this.rotationVelocityX = 0.005;
+                        this.rotationVelocityY = 0;
+                        this.rotationVelocityZ = 0;
+                        
+                        // *** POSICIÓN HORIZONTAL REALISTA AL ENSARTARSE ***
+                        // Aplicar orientación horizontal gradual, no instantánea
+                        this.rotationVelocityX = 0.02; // Velocidad suave hacia horizontal
+                        this.rotationVelocityY = 0;
+                        this.rotationVelocityZ = 0;
+                        
+                        score++;
+                        this.createSuccessParticles();
+                        
+                        // *** EFECTOS ADICIONALES PARA APILAMIENTO ***
+                        if (stackedRings.length > 0) {
+                            // Partículas extra para apilamiento
+                            this.createStackingParticles();
+                            
+                            // Vibración sutil de los aros ya apilados
+                            stackedRings.forEach(stackedRing => {
+                                stackedRing.rotationVelocityZ += (Math.random() - 0.5) * 0.01;
+                            });
+                        }
+                        
+                        return;
+                    }
+                    
+                    // Mantener rotación durante el deslizamiento
+                    this.rotationVelocityX = 0.05;
+                    this.rotationVelocityY = 0;
+                    this.rotationVelocityZ = (Math.random() - 0.5) * 0.02;
+                    
+                    return;
+                }
+                
+                // *** DETECCIÓN DE COLISIÓN NORMAL ***
+                for (let i = 0; i < poles.length; i++) {
+                    const pole = poles[i];
+                    
+                    // *** DIMENSIONES EXACTAS DEL CILINDRO ***
+                    const poleRadius = pole.width / 2; // 6 (radio real del cilindro)
+                    const poleTop = pole.y - pole.height / 2; // Parte superior del cilindro
+                    const poleBottom = pole.y + pole.height / 2; // Parte inferior del cilindro
+                    
+                    // *** DIMENSIONES EXACTAS DEL TORO ***
+                    const ringOuterRadius = this.radius; // 25 (radio exterior del toro)
+                    const ringInnerRadius = this.radius - this.thickness; // 19 (radio del agujero)
+                    
+                    // *** DISTANCIA RADIAL AL EJE DEL CILINDRO ***
+                    // Para un cilindro vertical, la distancia radial es la distancia horizontal al centro
+                    const dx = this.x - pole.x;
+                    const dz = this.z - 0; // Los palos están en z=0
+                    const radialDistanceToPole = Math.sqrt(dx * dx + dz * dz); // Distancia real al eje del cilindro
+                    
+                    // *** VERIFICAR RANGO VERTICAL (ALTURA DEL CILINDRO) ***
+                    // El toro debe estar intersectando verticalmente con el cilindro
+                    const ringTop = this.y - ringOuterRadius;
+                    const ringBottom = this.y + ringOuterRadius;
+                    const verticalOverlap = !(ringBottom < poleTop || ringTop > poleBottom);
+                    
+                    if (verticalOverlap) {
+                        
+                        // *** LÓGICA DE COLISIÓN CILINDRO-TORO EXACTA ***
+                        
+                        // CASO 1: EL EJE DEL CILINDRO PASA POR EL AGUJERO DEL TORO
+                        if (radialDistanceToPole <= ringInnerRadius) {
+                            // El cilindro está dentro del agujero - PUEDE ENSARTARSE
+                            
+                            // Verificar si el cilindro es lo suficientemente delgado para pasar
+                            if (poleRadius <= ringInnerRadius) {
+                                // El cilindro cabe en el agujero
+                                
+                                // *** VERIFICAR LÍMITE DE AROS POR PALO ***
+                                const currentStackedRings = rings.filter(ring => 
+                                    (ring.onPole || ring.slidingOnPole) && 
+                                    ring.poleIndex === i && 
+                                    ring !== this
+                                );
+                                
+                                if (currentStackedRings.length >= MAX_RINGS_PER_POLE) {
+                                    // PALO LLENO - Rebotar el aro
+                                    this.vy = -Math.abs(this.vy) * 0.6; // Rebote hacia abajo
+                                    this.vx = (Math.random() - 0.5) * 2; // Movimiento aleatorio horizontal
+                                    
+                                    // Mensaje informativo
+                                    console.log(`¡Palo ${i + 1} está lleno! Máximo ${MAX_RINGS_PER_POLE} aros por palo.`);
+                                    
+                                    break; // No verificar más palos
+                                }
+                                
+                                if (this.vy > 0 && this.y < poleBottom - ringOuterRadius) {
+                                    // *** INICIAR DESLIZAMIENTO EN LUGAR DE ENSARTE INSTANTÁNEO ***
+                                    this.slidingOnPole = true;
+                                    this.onPole = false; // No es "en palo" hasta que se detiene
+                                    this.poleIndex = i;
+                                    
+                                    // Configurar deslizamiento
+                                    this.slideStartY = this.y;
+                                    this.slideTargetY = poleBottom - ringOuterRadius; // Base del palo
+                                    this.slideVelocity = Math.max(this.vy * 0.8, 0.5); // Velocidad inicial del deslizamiento
+                                    
+                                    // Posicionar en el eje X del palo
+                                    this.x = pole.x;
+                                    this.z = 0;
+                                    
+                                    // Velocidades horizontales a 0 pero mantener vertical
+                                    this.vx = 0;
+                                    this.vz = 0;
+                                    
+                                    // Iniciar rotación
+                                    this.rotationVelocityX = 0.05;
+                                    this.rotationVelocityY = 0;
+                                    this.rotationVelocityZ = 0;
+                                    
+                                    return;
+                                }
+                                // Si no se ensarta, no hay colisión (pasa a través)
+                                continue;
+                            } else {
+                                // El cilindro es demasiado grueso - COLISIÓN CON EL AGUJERO
+                                const pushDirection = dx === 0 ? (Math.random() > 0.5 ? 1 : -1) : Math.sign(dx);
+                                const separationDistance = ringInnerRadius + poleRadius + 2;
+                                
+                                this.x = pole.x + pushDirection * separationDistance;
+                                this.vx = pushDirection * (Math.abs(this.vx) + 2);
+                                this.vy *= 0.8;
+                                
+                                this.rotationVelocityY += pushDirection * 0.1;
+                                this.rotationVelocityX += (Math.random() - 0.5) * 0.06;
+                                continue;
+                            }
+                        }
+                        
+                        // CASO 2: COLISIÓN ENTRE SUPERFICIE DEL CILINDRO Y MATERIAL DEL TORO
+                        else if (radialDistanceToPole > ringInnerRadius && 
+                                 radialDistanceToPole <= ringOuterRadius + poleRadius) {
+                            
+                            // Verificar si realmente hay intersección entre las superficies
+                            const distanceBetweenSurfaces = radialDistanceToPole - poleRadius;
+                            
+                            if (distanceBetweenSurfaces <= ringOuterRadius) {
+                                // HAY COLISIÓN ENTRE EL CILINDRO Y EL MATERIAL DEL TORO
+                                
+                                const penetration = ringOuterRadius - distanceBetweenSurfaces;
+                                
+                                if (penetration > 0) {
+                                    // Calcular dirección de empuje (desde el eje del cilindro hacia el centro del toro)
+                                    const pushDirection = dx === 0 ? (Math.random() > 0.5 ? 1 : -1) : Math.sign(dx);
+                                    
+                                    // Posicionar el toro justo fuera del cilindro
+                                    const targetDistance = poleRadius + ringOuterRadius + 1;
+                                    this.x = pole.x + pushDirection * targetDistance;
+                                    
+                                    // Aplicar impulso de rebote
+                                    const impactSpeed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+                                    const reboundForce = Math.max(2, impactSpeed * 0.8);
+                                    
+                                    this.vx = pushDirection * reboundForce;
+                                    this.vy *= 0.75; // Fricción vertical
+                                    
+                                    // Rotación por impacto
+                                    this.rotationVelocityY += pushDirection * 0.15;
+                                    this.rotationVelocityX += (Math.random() - 0.5) * 0.1;
+                                    this.rotationVelocityZ += (Math.random() - 0.5) * 0.05;
+                                    
+                                    // Partículas de impacto en el punto de contacto
+                                    const contactX = pole.x + Math.sign(dx) * poleRadius;
+                                    const contactY = this.y;
+                                    
+                                    for (let j = 0; j < 8; j++) {
+                                        waterParticles.push(new WaterParticle(
+                                            contactX + (Math.random() - 0.5) * 10,
+                                            contactY + (Math.random() - 0.5) * 15,
+                                            pushDirection * (Math.random() * 3 + 1),
+                                            (Math.random() - 0.5) * 4
+                                        ));
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // CASO 3: NO HAY COLISIÓN
+                        // radialDistanceToPole > ringOuterRadius + poleRadius
+                        // El cilindro y el toro están separados - no hacer nada
+                    }
+                    
+                    // *** COLISIÓN CON LA TAPA SUPERIOR DEL CILINDRO ***
+                    // Solo cuando el material sólido del toro toca la parte superior del cilindro
+                    const ringBottomSurface = this.y + ringOuterRadius;
+                    
+                    if (ringBottomSurface >= poleTop && 
+                        ringBottomSurface <= poleTop + 5 &&
+                        radialDistanceToPole > ringInnerRadius && // Debe ser material sólido del toro
+                        radialDistanceToPole <= ringOuterRadius + poleRadius &&
+                        this.vy < 0) { // Moviéndose hacia arriba (golpeando desde abajo)
+                        
+                        // Rebote en la tapa superior del cilindro
+                        this.y = poleTop - ringOuterRadius - 1;
+                        this.vy = -this.vy * 0.6; // Coeficiente de restitución
+                        this.vx *= 0.9; // Fricción lateral
+                        
+                        // Rotación por impacto en la tapa
+                        this.rotationVelocityX += 0.12;
+                        this.rotationVelocityZ += (Math.random() - 0.5) * 0.08;
+                        
+                        // Partículas de impacto en la tapa
+                        for (let j = 0; j < 5; j++) {
+                            waterParticles.push(new WaterParticle(
+                                pole.x + (Math.random() - 0.5) * poleRadius * 2,
+                                poleTop - 2,
+                                (Math.random() - 0.5) * 3,
+                                -Math.random() * 4
+                            ));
+                        }
+                    }
+                }
+            }
+
+            // *** MÉTODO PARA ORIENTAR EL ARO HORIZONTALMENTE SIN OSCILACIONES ***
+            setHorizontalPosition(deltaTime = 0.016) {
+                // Objetivos de rotación (posición horizontal)
+                const targetRotationX = -Math.PI / 2;
+                const targetRotationY = 0;
+                
+                // Parámetros del sistema de amortiguación crítica
+                const naturalFrequency = 8.0;    // Frecuencia natural del sistema
+                const dampingRatio = 1.1;         // Ligeramente sobre-amortiguado (evita cualquier oscilación)
+                const criticalDamping = 2.0 * naturalFrequency * dampingRatio;
+                
+                // --- ORIENTACIÓN EN EJE X (horizontal) ---
+                // Calcular la diferencia angular más corta
+                let errorX = targetRotationX - this.rotationX;
+                // Normalizar al rango [-π, π] para evitar rotaciones largas
+                while (errorX > Math.PI) errorX -= 2 * Math.PI;
+                while (errorX < -Math.PI) errorX += 2 * Math.PI;
+                
+                // Fuerza del resorte proporcional al error
+                const springForceX = naturalFrequency * naturalFrequency * errorX;
+                // Fuerza de amortiguación proporcional a la velocidad
+                const dampingForceX = criticalDamping * this.rotationVelocityX;
+                // Aceleración resultante
+                const accelerationX = springForceX - dampingForceX;
+                
+                // Integración usando Verlet implícito para estabilidad
+                this.rotationVelocityX += accelerationX * deltaTime;
+                this.rotationX += this.rotationVelocityX * deltaTime;
+                
+                // --- ORIENTACIÓN EN EJE Y (centrado) ---
+                let errorY = targetRotationY - this.rotationY;
+                while (errorY > Math.PI) errorY -= 2 * Math.PI;
+                while (errorY < -Math.PI) errorY += 2 * Math.PI;
+                
+                const springForceY = naturalFrequency * naturalFrequency * errorY;
+                const dampingForceY = criticalDamping * this.rotationVelocityY;
+                const accelerationY = springForceY - dampingForceY;
+                
+                this.rotationVelocityY += accelerationY * deltaTime;
+                this.rotationY += this.rotationVelocityY * deltaTime;
+                
+                // --- ROTACIÓN NATURAL MÍNIMA EN Z PARA REALISMO ---
+                // Añadir muy sutil movimiento browniano para que no se vea completamente rígido
+                const brownianForce = (Math.random() - 0.5) * 0.001;
+                const zDamping = 0.95; // Amortiguación suave en Z
+                
+                this.rotationVelocityZ = (this.rotationVelocityZ + brownianForce) * zDamping;
+                this.rotation += this.rotationVelocityZ; // Usar la propiedad rotation (Z) del juego original
+                
+                // Limitar velocidades extremas por seguridad (prevenir inestabilidad numérica)
+                const maxVelocity = 5.0;
+                this.rotationVelocityX = Math.max(-maxVelocity, Math.min(maxVelocity, this.rotationVelocityX));
+                this.rotationVelocityY = Math.max(-maxVelocity, Math.min(maxVelocity, this.rotationVelocityY));
+            }
+
+
+            // *** MÉTODO PARA CALCULAR POSICIÓN DE APILAMIENTO ***
+            calculateStackPosition(pole) {
+                const STACK_GAP = 3; // Gap entre aros para evitar z-fighting y colisiones
+                const ringThickness = this.thickness; // Grosor del tubo del toro (6)
+                
+                // Encontrar todos los aros ya ensartados en este palo
+                const stackedRings = rings.filter(ring => 
+                    ring.onPole && 
+                    ring.poleIndex === this.poleIndex && 
+                    ring !== this
+                );
+                
+                // Si no hay aros apilados, posicionar en la base
+                if (stackedRings.length === 0) {
+                    const poleBottom = pole.y + pole.height / 2;
+                    return poleBottom - this.radius; // Base del palo menos radio exterior del toro
+                }
+                
+                // Encontrar el aro más alto en la pila
+                let highestRingY = Number.MAX_VALUE;
+                for (let stackedRing of stackedRings) {
+                    if (stackedRing.y < highestRingY) {
+                        highestRingY = stackedRing.y;
+                    }
+                }
+                
+                // Posicionar el nuevo aro encima del más alto
+                // Cada aro ocupa: radio_exterior - radio_interior + gap
+                const stackHeight = (this.radius - (this.radius - this.thickness)) + STACK_GAP;
+                return highestRingY - stackHeight;
+            }
+
+            checkRingCollisions() {
+                if (this.onPole || this.slidingOnPole) return; // No colisionar si está en palo o deslizando
+                
+                for (let i = 0; i < rings.length; i++) {
+                    const otherRing = rings[i];
+                    
+                    // No colisionar consigo mismo, con aros en palos, o aros deslizando
+                    if (otherRing === this || otherRing.onPole || otherRing.slidingOnPole) continue;
+                    
+                    const dx = this.x - otherRing.x;
+                    const dy = this.y - otherRing.y;
+                    // dz = 0 ya que ambos están en z=0
+                    
+                    // Distancia 2D entre centros de los aros
+                    const distance2D = Math.sqrt(dx * dx + dy * dy);
+                    
+                    // *** HITBOXES EXACTAS PARA COLISIÓN TORO-TORO ***
+                    // Radio exterior de cada toro (donde está la superficie del tubo)
+                    const thisOuterRadius = this.radius;
+                    const otherOuterRadius = otherRing.radius;
+                    
+                    // Grosor del tubo del toro
+                    const thisThickness = this.thickness;
+                    const otherThickness = otherRing.thickness;
+                    
+                    // Distancia mínima para colisión (superficie a superficie)
+                    const minDistanceForCollision = thisOuterRadius + otherOuterRadius;
+                    
+                    // Verificar colisión 2D entre las superficies de los toros
+                    if (distance2D < minDistanceForCollision && distance2D > 0) {
+                        // *** COLISIÓN DETECTADA ***
+                        
+                        // Calcular penetración exacta
+                        const penetrationDepth = minDistanceForCollision - distance2D;
+                        const halfPenetration = penetrationDepth * 0.5;
+                        
+                        // Vector normalizado de separación (solo XY)
+                        const normalX = dx / distance2D;
+                        const normalY = dy / distance2D;
+                        
+                        // *** SEPARACIÓN FÍSICA PRECISA ***
+                        // Mover cada aro la mitad de la penetración para separarlos exactamente
+                        this.x += normalX * halfPenetration;
+                        this.y += normalY * halfPenetration;
+                        
+                        otherRing.x -= normalX * halfPenetration;
+                        otherRing.y -= normalY * halfPenetration;
+                        
+                        // Mantener Z en 0 siempre
+                        this.z = 0;
+                        otherRing.z = 0;
+                        
+                        // *** FÍSICA DE COLISIÓN REALISTA ***
+                        // Calcular velocidades relativas (solo XY)
+                        const relativeVx = this.vx - otherRing.vx;
+                        const relativeVy = this.vy - otherRing.vy;
+                        
+                        // Velocidad relativa en la dirección de la normal de contacto
+                        const relativeVelNormal = relativeVx * normalX + relativeVy * normalY;
+                        
+                        // Solo aplicar impulso si los objetos se están acercando
+                        if (relativeVelNormal < 0) {
+                            // Coeficiente de restitución (rebote) realista para aros flotando
+                            const restitution = 0.35;
+                            
+                            // Masas iguales para ambos aros
+                            const massRatio = 0.5;
+                            
+                            // Calcular impulso de colisión
+                            const impulse = -(1 + restitution) * relativeVelNormal * massRatio;
+                            
+                            // *** APLICAR IMPULSO DE COLISIÓN ***
+                            this.vx += impulse * normalX;
+                            this.vy += impulse * normalY;
+                            
+                            otherRing.vx -= impulse * normalX;
+                            otherRing.vy -= impulse * normalY;
+                            
+                            // Asegurar que no hay velocidad en Z
+                            this.vz = 0;
+                            otherRing.vz = 0;
+                            
+                            // *** EFECTOS DE ROTACIÓN POR IMPACTO ***
+                            const impactStrength = Math.abs(impulse) * 0.15;
+                            
+                            // Rotación tangencial realista
+                            const tangentX = -normalY;
+                            const tangentY = normalX;
+                            
+                            const thisTangentialVel = this.vx * tangentX + this.vy * tangentY;
+                            const otherTangentialVel = otherRing.vx * tangentX + otherRing.vy * tangentY;
+                            
+                            // Aplicar rotación basada en la velocidad tangencial
+                            this.rotationVelocityX += normalY * impactStrength * 0.5;
+                            this.rotationVelocityY += normalX * impactStrength * 0.5;
+                            this.rotationVelocityZ += thisTangentialVel * 0.02;
+                            
+                            otherRing.rotationVelocityX += -normalY * impactStrength * 0.5;
+                            otherRing.rotationVelocityY += -normalX * impactStrength * 0.5;
+                            otherRing.rotationVelocityZ += otherTangentialVel * 0.02;
+                            
+                            // *** EFECTOS VISUALES DE COLISIÓN ***
+                            // Punto de contacto en la superficie del primer aro
+                            const contactX = this.x - normalX * thisOuterRadius;
+                            const contactY = this.y - normalY * thisOuterRadius;
+                            
+                            // Crear partículas de salpicadura en el punto de contacto
+                            const splashCount = Math.min(8, Math.max(3, Math.floor(impactStrength * 20)));
+                            
+                            for (let j = 0; j < splashCount; j++) {
+                                const particleSpeed = impactStrength * (2 + Math.random() * 3);
+                                const splashAngle = Math.atan2(normalY, normalX) + (Math.random() - 0.5) * Math.PI * 0.5;
+                                
+                                waterParticles.push(new WaterParticle(
+                                    contactX + (Math.random() - 0.5) * 10,
+                                    contactY + (Math.random() - 0.5) * 10,
+                                    Math.cos(splashAngle) * particleSpeed,
+                                    Math.sin(splashAngle) * particleSpeed
+                                ));
+                            }
+                            
+                            // Sonido de impacto simulado con vibración de rotación
+                            const vibrationIntensity = Math.min(0.1, impactStrength * 0.5);
+                            this.rotationVelocityX += (Math.random() - 0.5) * vibrationIntensity;
+                            this.rotationVelocityY += (Math.random() - 0.5) * vibrationIntensity;
+                            
+                            otherRing.rotationVelocityX += (Math.random() - 0.5) * vibrationIntensity;
+                            otherRing.rotationVelocityY += (Math.random() - 0.5) * vibrationIntensity;
+                            
+                            // *** TENDENCIA A HORIZONTAL DESPUÉS DE COLISIONES FUERTES ***
+                            if (impactStrength > 0.3) {
+                                this.setHorizontalPosition();
+                                otherRing.setHorizontalPosition();
+                            }
+                        }
+                    }
+                }
+            }
+
+            createSuccessParticles() {
+                // Crear partículas de éxito
+                for (let j = 0; j < 20; j++) {
+                    waterParticles.push(new WaterParticle(
+                        this.x + (Math.random() - 0.5) * 50,
+                        this.y + (Math.random() - 0.5) * 50,
+                        (Math.random() - 0.5) * 4,
+                        (Math.random() - 0.5) * 4
+                    ));
+                }
+            }
+
+            createStackingParticles() {
+                // Crear partículas especiales para apilamiento
+                const particleCount = 12;
+                for (let j = 0; j < particleCount; j++) {
+                    const angle = (j / particleCount) * Math.PI * 2;
+                    const distance = this.radius + (Math.random() * 10);
+                    const particleX = this.x + Math.cos(angle) * distance;
+                    const particleY = this.y + (Math.random() - 0.5) * this.thickness;
+                    
+                    waterParticles.push(new WaterParticle(
+                        particleX,
+                        particleY,
+                        Math.cos(angle) * (0.5 + Math.random()),
+                        (Math.random() - 0.5) * 2
+                    ));
+                }
+            }
+
+            // *** MÉTODOS DE FÍSICA MANTENIDOS EXACTOS ***
+            applyWaterDrag() {
+                const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+                
+                const linearDragX = -WATER.dragLinear * this.vx;
+                const linearDragY = -WATER.dragLinear * this.vy;
+                
+                let quadraticDragX = 0;
+                let quadraticDragY = 0;
+                if (speed > 0) {
+                    quadraticDragX = -WATER.dragQuadratic * this.vx * speed;
+                    quadraticDragY = -WATER.dragQuadratic * this.vy * speed;
+                }
+                
+                this.vx += linearDragX + quadraticDragX;
+                this.vy += linearDragY + quadraticDragY;
+            }
+
+            applyWaterBuoyancy() {
+                if (this.vy > -WATER.maxFloatSpeed) {
+                    this.vy -= WATER.floatForce;
+                }
+            }
+
+            applyDirectionChangeBraking() {
+                if ((this.prevVx > 0 && this.vx < 0) || (this.prevVx < 0 && this.vx > 0)) {
+                    this.vx *= WATER.brakeFactor;
+                }
+                
+                if ((this.prevVy > 0 && this.vy < 0) || (this.prevVy < 0 && this.vy > 0)) {
+                    this.vy *= WATER.brakeFactor;
+                }
+            }
+
+            applyWaterForce(waterX, waterY, force, angle = 0) {
+                if (this.onPole) return;
+
+                const dx = this.x - waterX;
+                const dy = this.y - waterY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < WATER_RADIUS && distance > 0) {
+                    const strength = (WATER_RADIUS - distance) / WATER_RADIUS;
+                    
+                    const forceX = Math.cos(angle) * force * strength;
+                    const forceY = Math.sin(angle) * force * strength;
+
+                    this.vx += forceX * 0.15;
+                    this.vy += forceY * 0.15;
+
+                    // Mantener Z bloqueado
+                    this.vz = 0;
+                    this.z = 0;
+                }
+            }
+
+            applyCurrentField() {
+                if (this.onPole) return;
+                
+                const fieldVel = sampleVelocityField(this.x, this.y);
+                let magnitude = Math.sqrt(fieldVel.vx * fieldVel.vx + fieldVel.vy * fieldVel.vy);
+                
+                const timeSinceLeft = currentTime - lastActivationTime.left;
+                const timeSinceRight = currentTime - lastActivationTime.right;
+                const recentActivation = Math.min(timeSinceLeft, timeSinceRight) < 2000;
+                
+                const centerX = CANVAS_WIDTH / 2;
+                const centerY = CANVAS_HEIGHT / 2;
+                const distanceToCenter = Math.sqrt((this.x - centerX) ** 2 + (this.y - centerY) ** 2);
+                const inCentralArea = distanceToCenter < 150;
+                
+                if (recentActivation && inCentralArea && magnitude < MIN_RESIDUAL) {
+                    let targetX, targetY;
+                    if (timeSinceLeft < timeSinceRight) {
+                        targetX = 0; targetY = CANVAS_HEIGHT;
+                    } else {
+                        targetX = CANVAS_WIDTH; targetY = CANVAS_HEIGHT;
+                    }
+                    
+                    const dx = targetX - this.x;
+                    const dy = targetY - this.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist > 0) {
+                        fieldVel.vx += (dx / dist) * MIN_RESIDUAL * 0.3;
+                        fieldVel.vy += (dy / dist) * MIN_RESIDUAL * 0.3;
+                        magnitude = Math.sqrt(fieldVel.vx * fieldVel.vx + fieldVel.vy * fieldVel.vy);
+                    }
+                }
+                
+                if (magnitude > MAX_CURRENT_FORCE) {
+                    fieldVel.vx = (fieldVel.vx / magnitude) * MAX_CURRENT_FORCE;
+                    fieldVel.vy = (fieldVel.vy / magnitude) * MAX_CURRENT_FORCE;
+                }
+                
+                const currentForceMultiplier = 0.12;
+                this.vx += fieldVel.vx * currentForceMultiplier;
+                this.vy += fieldVel.vy * currentForceMultiplier;
+                
+                const turbulenceX = (Math.random() - 0.5) * TURBULENCE_STRENGTH;
+                const turbulenceY = (Math.random() - 0.5) * TURBULENCE_STRENGTH;
+                this.vx += turbulenceX * 0.01;
+                this.vy += turbulenceY * 0.01;
+
+                // Mantener Z bloqueado
+                this.vz = 0;
+                this.z = 0;
+            }
+
+            applyResidualForce(residualX, residualY, residualStrength) {
+                if (this.onPole || residualStrength <= 0) return;
+
+                const dx = this.x - residualX;
+                const dy = this.y - residualY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < RESIDUAL_RADIUS && distance > 0) {
+                    const strength = (RESIDUAL_RADIUS - distance) / RESIDUAL_RADIUS;
+                    
+                    const angle = Math.atan2(dy, dx);
+                    const perpAngle = angle + Math.PI / 2;
+                    
+                    const forceX = Math.cos(perpAngle) * residualStrength * strength * 0.3;
+                    const forceY = Math.sin(perpAngle) * residualStrength * strength * 0.3 - residualStrength * strength * 0.1;
+
+                    this.vx += forceX * 0.05;
+                    this.vy += forceY * 0.05;
+                    
+                    // Mantener Z bloqueado
+                    this.vz = 0;
+                    this.z = 0;
+                }
+            }
+
+            dispose() {
+                if (this.mesh) {
+                    scene.remove(this.mesh);
+                    this.mesh.geometry.dispose();
+                    this.mesh.material.dispose();
+                }
+            }
+        }
+
+        // Clase Pole modificada para 3D
+        class Pole {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.width = 12;
+                this.height = 150;
+                this.createMesh();
+            }
+
+            createMesh() {
+                // Crear cilindro 3D para el palo
+                // *** IMPORTANTE: El cilindro se centra en su pivot point ***
+                // CylinderGeometry(radTop, radBottom, height, segments)
+                const poleGeometry = new THREE.CylinderGeometry(this.width/2, this.width/2, this.height, 12);
+                const poleMaterial = new THREE.MeshStandardMaterial({
+                    color: 0xFF89C4,
+                    metalness: 0.4, // Aumentado para más brillo metálico
+                    roughness: 0.05, // Reducido para superficie más reflectante
+                    emissive: 0xFF89C4,
+                    emissiveIntensity: 0.1, // Añadida luminosidad propia
+                });
+
+                this.mesh = new THREE.Mesh(poleGeometry, poleMaterial);
+                this.mesh.castShadow = true;
+                this.mesh.receiveShadow = true;
+
+                // *** POSICIONAMIENTO CONSISTENTE CON LA DETECCIÓN DE COLISIONES ***
+                // El palo se centra en (this.x, this.y) en coordenadas 2D
+                // En coordenadas 3D debe estar también centrado en ese punto
+                const pos3D = convert2DTo3D(this.x, this.y, 0);
+                this.mesh.position.set(pos3D.x, pos3D.y, pos3D.z);
+
+                scene.add(this.mesh);
+
+                // Crear base del palo (abajo del cilindro)
+                const baseGeometry = new THREE.CylinderGeometry(this.width, this.width*1.5, 20, 12);
+                const baseMaterial = new THREE.MeshStandardMaterial({
+                    color: 0xFF89C4,
+                    metalness: 0.4, // Aumentado para más brillo metálico
+                    roughness: 0.05, // Reducido para superficie más reflectante
+                    emissive: 0xFF89C4,
+                    emissiveIntensity: 0.1, // Añadida luminosidad propia
+                });
+
+                this.baseMesh = new THREE.Mesh(baseGeometry, baseMaterial);
+                this.baseMesh.castShadow = true;
+                this.baseMesh.receiveShadow = true;
+                
+                // *** BASE ALINEADA CON LA PARTE INFERIOR DEL CILINDRO ***
+                // El cilindro tiene altura 150, su parte inferior es a -75 desde el centro
+                // La base está a -75 - 10 = -85 en Y
+                const baseYOffset = -this.height + 200; // Subido 50 unidades
+                const basePos3D = convert2DTo3D(this.x, this.y + baseYOffset, 0);
+                this.baseMesh.position.set(basePos3D.x, basePos3D.y, basePos3D.z);
+
+                scene.add(this.baseMesh);
+                poles3D.push(this);
+            }
+
+            // *** MÉTODO PARA ACTUALIZAR COLOR BASADO EN NÚMERO DE AROS ***
+            updateColorBasedOnRings(poleIndex) {
+                const stackedRings = rings.filter(ring => 
+                    (ring.onPole || ring.slidingOnPole) && 
+                    ring.poleIndex === poleIndex
+                );
+                
+                let color = 0xFF89C4; // Color original (rosa)
+                
+                if (stackedRings.length >= MAX_RINGS_PER_POLE) {
+                    color = 0xFF0000; // Rojo - palo lleno (5 aros)
+                } else if (stackedRings.length >= MAX_RINGS_PER_POLE - 1) {
+                    color = 0xFFAA00; // Naranja - casi lleno (4 aros)
+                } else if (stackedRings.length >= MAX_RINGS_PER_POLE - 2) {
+                    color = 0xFFFF00; // Amarillo - medio lleno (3 aros)
+                }
+                
+                // Actualizar color del palo y la base
+                if (this.mesh && this.mesh.material) {
+                    this.mesh.material.color.setHex(color);
+                }
+                if (this.baseMesh && this.baseMesh.material) {
+                    this.baseMesh.material.color.setHex(color);
+                }
+            }
+
+            dispose() {
+                if (this.mesh) {
+                    scene.remove(this.mesh);
+                    this.mesh.geometry.dispose();
+                    this.mesh.material.dispose();
+                }
+                if (this.baseMesh) {
+                    scene.remove(this.baseMesh);
+                    this.baseMesh.geometry.dispose();
+                    this.baseMesh.material.dispose();
+                }
+            }
+        }
+
+        // Sistema de partículas de agua 3D
+        function createWaterParticleSystem() {
+            const particleCount = 1000;
+            const particles = new THREE.BufferGeometry();
+            const positions = new Float32Array(particleCount * 3);
+            const colors = new Float32Array(particleCount * 3);
+            const sizes = new Float32Array(particleCount);
+            const alphas = new Float32Array(particleCount);
+
+            for (let i = 0; i < particleCount; i++) {
+                positions[i * 3] = 0;
+                positions[i * 3 + 1] = 0;
+                positions[i * 3 + 2] = 0;
+                
+                colors[i * 3] = 0.7;     // R
+                colors[i * 3 + 1] = 0.85; // G
+                colors[i * 3 + 2] = 1.0;  // B
+                
+                sizes[i] = 0;
+                alphas[i] = 0;
+            }
+
+            particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            particles.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            particles.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+            particles.setAttribute('alpha', new THREE.BufferAttribute(alphas, 1));
+
+            const particleMaterial = new THREE.ShaderMaterial({
+                uniforms: {},
+                vertexShader: `
+                    attribute float size;
+                    attribute float alpha;
+                    attribute vec3 color;
+                    varying vec3 vColor;
+                    varying float vAlpha;
+                    
+                    void main() {
+                        vColor = color;
+                        vAlpha = alpha;
+                        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                        gl_PointSize = size * (300.0 / -mvPosition.z);
+                        gl_Position = projectionMatrix * mvPosition;
+                    }
+                `,
+                fragmentShader: `
+                    varying vec3 vColor;
+                    varying float vAlpha;
+                    
+                    void main() {
+                        float distanceToCenter = length(gl_PointCoord - 0.5);
+                        if (distanceToCenter > 0.5) discard;
+                        
+                        float alpha = vAlpha * (1.0 - distanceToCenter * 2.0);
+                        gl_FragColor = vec4(vColor, alpha);
+                    }
+                `,
+                transparent: true,
+                depthWrite: false
+            });
+
+            waterParticlesSystem = new THREE.Points(particles, particleMaterial);
+            scene.add(waterParticlesSystem);
+        }
+
+        function updateWaterParticleSystem() {
+            if (!waterParticlesSystem) return;
+
+            const positions = waterParticlesSystem.geometry.attributes.position.array;
+            const sizes = waterParticlesSystem.geometry.attributes.size.array;
+            const alphas = waterParticlesSystem.geometry.attributes.alpha.array;
+
+            let particleIndex = 0;
+
+            // Actualizar partículas existentes
+            for (let i = 0; i < waterParticles.length; i++) {
+                const particle = waterParticles[i];
+                
+                if (particleIndex < positions.length / 3) {
+                    const pos3D = convert2DTo3D(particle.x, particle.y, (Math.random() - 0.5) * 20);
+                    
+                    positions[particleIndex * 3] = pos3D.x;
+                    positions[particleIndex * 3 + 1] = pos3D.y;
+                    positions[particleIndex * 3 + 2] = pos3D.z;
+                    
+                    sizes[particleIndex] = particle.size * 5;
+                    alphas[particleIndex] = particle.life;
+                    
+                    particleIndex++;
+                }
+            }
+
+            // Limpiar partículas restantes
+            for (let i = particleIndex; i < positions.length / 3; i++) {
+                positions[i * 3] = 0;
+                positions[i * 3 + 1] = 0;
+                positions[i * 3 + 2] = 0;
+                sizes[i] = 0;
+                alphas[i] = 0;
+            }
+
+            waterParticlesSystem.geometry.attributes.position.needsUpdate = true;
+            waterParticlesSystem.geometry.attributes.size.needsUpdate = true;
+            waterParticlesSystem.geometry.attributes.alpha.needsUpdate = true;
+        }
+
+        // *** MANTENER TODA LA LÓGICA FÍSICA DEL CAMPO DE VELOCIDADES EXACTA ***
+        
+        // Inicializar campo de velocidad (mantenido exacto)
+        function initVelocityField() {
+            velocityField = [];
+            previousVelocityField = [];
+            for (let y = 0; y < GRID_ROWS; y++) {
+                velocityField[y] = [];
+                previousVelocityField[y] = [];
+                for (let x = 0; x < GRID_COLS; x++) {
+                    velocityField[y][x] = { vx: 0, vy: 0 };
+                    previousVelocityField[y][x] = { vx: 0, vy: 0 };
+                }
+            }
+        }
+
+        function canvasToGrid(canvasX, canvasY) {
+            const gridX = Math.floor((canvasX / CANVAS_WIDTH) * GRID_COLS);
+            const gridY = Math.floor((canvasY / CANVAS_HEIGHT) * GRID_ROWS);
+            return { 
+                x: Math.max(0, Math.min(GRID_COLS - 1, gridX)), 
+                y: Math.max(0, Math.min(GRID_ROWS - 1, gridY)) 
+            };
+        }
+
+        function gridToCanvas(gridX, gridY) {
+            return {
+                x: (gridX / GRID_COLS) * CANVAS_WIDTH,
+                y: (gridY / GRID_ROWS) * CANVAS_HEIGHT
+            };
+        }
+
+        function sampleVelocityField(canvasX, canvasY) {
+            const gridPos = canvasToGrid(canvasX, canvasY);
+            const x = gridPos.x;
+            const y = gridPos.y;
+            
+            if (x < GRID_COLS - 1 && y < GRID_ROWS - 1) {
+                const fx = (canvasX / CANVAS_WIDTH) * GRID_COLS - x;
+                const fy = (canvasY / CANVAS_HEIGHT) * GRID_ROWS - y;
+                
+                const v00 = velocityField[y][x];
+                const v10 = velocityField[y][x + 1];
+                const v01 = velocityField[y + 1][x];
+                const v11 = velocityField[y + 1][x + 1];
+                
+                const vx = v00.vx * (1 - fx) * (1 - fy) + 
+                          v10.vx * fx * (1 - fy) + 
+                          v01.vx * (1 - fx) * fy + 
+                          v11.vx * fx * fy;
+                          
+                const vy = v00.vy * (1 - fx) * (1 - fy) + 
+                          v10.vy * fx * (1 - fy) + 
+                          v01.vy * (1 - fx) * fy + 
+                          v11.vy * fx * fy;
+                
+                return { vx, vy };
+            }
+            
+            return velocityField[y][x];
+        }
+
+        function injectCentralUpflow(strength) {
+            const centerX = CANVAS_WIDTH / 2;
+            const bottomY = CANVAS_HEIGHT;
+            
+            for (let gy = 0; gy < GRID_ROWS; gy++) {
+                for (let gx = 0; gx < GRID_COLS; gx++) {
+                    const cellPos = gridToCanvas(gx + 0.5, gy + 0.5);
+                    const dx = cellPos.x - centerX;
+                    const distanceFromCenter = Math.abs(dx);
+                    const heightFromBottom = bottomY - cellPos.y;
+                    
+                    if (distanceFromCenter <= CENTRAL_UPFLOW_RADIUS && heightFromBottom > 0) {
+                        const horizontalAttenuation = Math.exp(-distanceFromCenter * distanceFromCenter / (CENTRAL_UPFLOW_RADIUS * CENTRAL_UPFLOW_RADIUS * 0.5));
+                        const verticalAttenuation = Math.exp(-heightFromBottom / (CANVAS_HEIGHT * 0.3));
+                        const totalIntensity = strength * horizontalAttenuation * verticalAttenuation;
+                        
+                        const upwardForce = -totalIntensity * (1 + heightFromBottom / CANVAS_HEIGHT);
+                        velocityField[gy][gx].vy += upwardForce;
+                        
+                        if (distanceFromCenter > 0) {
+                            const convergenceForce = totalIntensity * 0.2;
+                            const directionToCenter = dx < 0 ? 1 : -1;
+                            velocityField[gy][gx].vx += directionToCenter * convergenceForce;
+                        }
+                        
+                        const turbulence = totalIntensity * 0.1;
+                        velocityField[gy][gx].vx += (Math.random() - 0.5) * turbulence;
+                        velocityField[gy][gx].vy += (Math.random() - 0.5) * turbulence * 0.5;
+                    }
+                }
+            }
+        }
+
+        function injectVelocity(emitterX, emitterY, angle, strength) {
+            const cosAngle = Math.cos(angle);
+            const sinAngle = Math.sin(angle);
+            
+            for (let gy = 0; gy < GRID_ROWS; gy++) {
+                for (let gx = 0; gx < GRID_COLS; gx++) {
+                    const cellPos = gridToCanvas(gx + 0.5, gy + 0.5);
+                    const dx = cellPos.x - emitterX;
+                    const dy = cellPos.y - emitterY;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance === 0) continue;
+                    
+                    const cellAngle = Math.atan2(dy, dx);
+                    const angleDiff = Math.abs(cellAngle - angle);
+                    const normalizedAngleDiff = Math.min(angleDiff, 2 * Math.PI - angleDiff);
+                    
+                    if (normalizedAngleDiff <= CONE_ANGLE && distance <= REACH) {
+                        const distanceAttenuation = Math.exp(-distance / (REACH * 0.3));
+                        const angleAttenuation = Math.exp(-normalizedAngleDiff * normalizedAngleDiff / (CONE_ANGLE * CONE_ANGLE * 0.5));
+                        const intensity = strength * distanceAttenuation * angleAttenuation;
+                        
+                        velocityField[gy][gx].vx += cosAngle * intensity;
+                        velocityField[gy][gx].vy += sinAngle * intensity;
+                        
+                        const perpAngle = angle + Math.PI / 2;
+                        const vortexStrength = intensity * 0.3 * Math.sin(distance / 50);
+                        velocityField[gy][gx].vx += Math.cos(perpAngle) * vortexStrength;
+                        velocityField[gy][gx].vy += Math.sin(perpAngle) * vortexStrength;
+                    }
+                }
+            }
+        }
+
+        function updateVelocityField(deltaTime) {
+            const decayFactor = Math.exp(-deltaTime / (DECAY_TAU * 1000));
+            const newField = [];
+            
+            for (let y = 0; y < GRID_ROWS; y++) {
+                for (let x = 0; x < GRID_COLS; x++) {
+                    previousVelocityField[y][x].vx = velocityField[y][x].vx;
+                    previousVelocityField[y][x].vy = velocityField[y][x].vy;
+                }
+            }
+            
+            for (let y = 0; y < GRID_ROWS; y++) {
+                newField[y] = [];
+                for (let x = 0; x < GRID_COLS; x++) {
+                    newField[y][x] = { vx: 0, vy: 0 };
+                }
+            }
+            
+            for (let y = 0; y < GRID_ROWS; y++) {
+                for (let x = 0; x < GRID_COLS; x++) {
+                    const current = velocityField[y][x];
+                    
+                    let vx = current.vx * decayFactor;
+                    let vy = current.vy * decayFactor;
+                    
+                    let neighbors = 0;
+                    let avgVx = 0, avgVy = 0;
+                    
+                    for (let dy = -1; dy <= 1; dy++) {
+                        for (let dx = -1; dx <= 1; dx++) {
+                            const nx = x + dx;
+                            const ny = y + dy;
+                            if (nx >= 0 && nx < GRID_COLS && ny >= 0 && ny < GRID_ROWS) {
+                                avgVx += velocityField[ny][nx].vx;
+                                avgVy += velocityField[ny][nx].vy;
+                                neighbors++;
+                            }
+                        }
+                    }
+                    
+                    if (neighbors > 0) {
+                        avgVx /= neighbors;
+                        avgVy /= neighbors;
+                        
+                        vx += (avgVx - vx) * WATER.viscosity * deltaTime / 16.67;
+                        vy += (avgVy - vy) * WATER.viscosity * deltaTime / 16.67;
+                    }
+                    
+                    const prevVx = previousVelocityField[y][x].vx;
+                    const prevVy = previousVelocityField[y][x].vy;
+                    
+                    vx = prevVx * WATER.inertia + vx * (1 - WATER.inertia);
+                    vy = prevVy * WATER.inertia + vy * (1 - WATER.inertia);
+                    
+                    newField[y][x].vx = vx;
+                    newField[y][x].vy = vy;
+                }
+            }
+            
+            velocityField = newField;
+        }
+
+        // Clase WaterParticle (mantenida exacta)
+        class WaterParticle {
+            constructor(x, y, vx, vy) {
+                this.x = x;
+                this.y = y;
+                this.vx = vx;
+                this.vy = vy;
+                this.life = 1.0;
+                this.size = Math.random() * 3 + 1;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += 0.1;
+                this.life -= 0.02;
+                this.size *= 0.99;
+            }
+        }
+
+        function createWaterJet(x, y, angle) {
+            for (let i = 0; i < 12; i++) {
+                const spread = (Math.random() - 0.5) * 0.8;
+                const jetAngle = angle + spread;
+                const speed = Math.random() * 4 + 3;
+                
+                waterParticles.push(new WaterParticle(
+                    x + (Math.random() - 0.5) * 15,
+                    y + (Math.random() - 0.5) * 15,
+                    Math.cos(jetAngle) * speed,
+                    Math.sin(jetAngle) * speed
+                ));
+            }
+            
+            for (let i = 0; i < 6; i++) {
+                const distance = Math.random() * 100 + 50;
+                const spreadAngle = angle + (Math.random() - 0.5) * CONE_ANGLE * 2;
+                const px = x + Math.cos(spreadAngle) * distance;
+                const py = y + Math.sin(spreadAngle) * distance;
+                
+                waterParticles.push(new WaterParticle(
+                    px, py,
+                    Math.cos(spreadAngle) * (Math.random() + 0.5),
+                    Math.sin(spreadAngle) * (Math.random() + 0.5)
+                ));
+            }
+        }
+
+        // Función para hacer el canvas responsive
+        function makeCanvasResponsive() {
+            const gameContainer = document.getElementById('gameContainer');
+            const waterOverlay = document.getElementById('waterOverlay');
+            
+            // Configurar el tamaño responsivo
+            function updateCanvasSize() {
+                const isMobile = window.innerWidth <= 767;
+                
+                if (isMobile) {
+                    const maxWidth = window.innerWidth * 0.95;
+                    const maxHeight = window.innerHeight * 0.6;
+                    const aspectRatio = CANVAS_WIDTH / CANVAS_HEIGHT;
+                    
+                    let newWidth = Math.min(maxWidth, CANVAS_WIDTH);
+                    let newHeight = newWidth / aspectRatio;
+                    
+                    if (newHeight > maxHeight) {
+                        newHeight = maxHeight;
+                        newWidth = newHeight * aspectRatio;
+                    }
+                    
+                    gameContainer.style.width = `${newWidth}px`;
+                    gameContainer.style.height = `${newHeight}px`;
+                    
+                    if (renderer) {
+                        renderer.setSize(newWidth, newHeight);
+                        camera.aspect = newWidth / newHeight;
+                        camera.updateProjectionMatrix();
+                    }
+                    
+                    waterOverlay.style.width = `${newWidth}px`;
+                    waterOverlay.style.height = `${newHeight}px`;
+                } else {
+                    // En PC, mantener tamaño original
+                    gameContainer.style.width = `${CANVAS_WIDTH}px`;
+                    gameContainer.style.height = `${CANVAS_HEIGHT}px`;
+                    
+                    if (renderer) {
+                        renderer.setSize(CANVAS_WIDTH, CANVAS_HEIGHT);
+                        camera.aspect = CANVAS_WIDTH / CANVAS_HEIGHT;
+                        camera.updateProjectionMatrix();
+                    }
+                    
+                    waterOverlay.style.width = `${CANVAS_WIDTH}px`;
+                    waterOverlay.style.height = `${CANVAS_HEIGHT}px`;
+                }
+            }
+            
+            // Llamar al inicio y en cada resize
+            updateCanvasSize();
+            window.addEventListener('resize', updateCanvasSize);
+        }
+
+        // Inicializar el juego
+        function init() {
+            // Configurar eventos de botones primero
+            setupButtonEvents();
+            
+            // Hacer el canvas responsive
+            makeCanvasResponsive();
+            
+            // Inicializar Three.js
+            initThreeJS();
+            
+            // Crear sistema de partículas
+            createWaterParticleSystem();
+            
+            // Inicializar campo de velocidad
+            initVelocityField();
+            
+            // Crear palitos (solo 2 palos para 28 aros totales)
+            poles.push(new Pole(250, CANVAS_HEIGHT - 200)); // Palo izquierdo
+            poles.push(new Pole(550, CANVAS_HEIGHT - 200)); // Palo derecho
+
+            // Crear aros (28 aros totales para 2 palos)
+            // Colores solicitados: Amarillo, Azul, Verde, Rojo, Naranja
+            const colors = [0xFFF200, 0x00B6FF, 0x00FF21, 0xFF0000, 0xFF8300];
+            for (let i = 0; i < 10; i++) {
+                // Iniciar los aros en el fondo
+                rings.push(new Ring(
+                    Math.random() * (CANVAS_WIDTH - 100) + 50,
+                    CANVAS_HEIGHT - 25, // Muy cerca del fondo
+                    colors[i % colors.length]
+                ));
+            }
+        }
+
+        // Bucle principal del juego
+        function gameLoop() {
+            const deltaTime = 16.67;
+            currentTime = Date.now();
+            
+            updateVelocityField(deltaTime);
+
+            const leftJetX = 0;
+            const leftJetY = CANVAS_HEIGHT;
+            const rightJetX = CANVAS_WIDTH;
+            const rightJetY = CANVAS_HEIGHT;
+            
+            const leftJetAngle = -Math.PI / 4;
+            const rightJetAngle = -3 * Math.PI / 4;
+
+            const prevLeftActive = leftJetActive;
+            const prevRightActive = rightJetActive;
+            leftJetActive = keys['s'] || keys['S'];
+            rightJetActive = keys['l'] || keys['L'];
+
+            // Actualizar efectos de boquillas
+            jetNozzles[0].material.emissive.setHex(leftJetActive ? 0x00FFFF : 0x000000);
+            jetNozzles[1].material.emissive.setHex(rightJetActive ? 0x00FFFF : 0x000000);
+
+            if (leftJetActive) {
+                if (!prevLeftActive) lastActivationTime.left = currentTime;
+                createWaterJet(leftJetX, leftJetY, leftJetAngle);
+                leftResidual.strength = Math.min(RESIDUAL_FORCE, leftResidual.strength + 0.5);
+                
+                injectVelocity(leftJetX, leftJetY, leftJetAngle, INJECT_STRENGTH);
+                
+                rings.forEach(ring => {
+                    ring.applyWaterForce(leftJetX, leftJetY, WATER_FORCE, leftJetAngle);
+                });
+            } else {
+                leftResidual.strength = Math.max(0, leftResidual.strength - 0.1);
+            }
+
+            if (rightJetActive) {
+                if (!prevRightActive) lastActivationTime.right = currentTime;
+                createWaterJet(rightJetX, rightJetY, rightJetAngle);
+                rightResidual.strength = Math.min(RESIDUAL_FORCE, rightResidual.strength + 0.5);
+                
+                injectVelocity(rightJetX, rightJetY, rightJetAngle, INJECT_STRENGTH);
+                
+                rings.forEach(ring => {
+                    ring.applyWaterForce(rightJetX, rightJetY, WATER_FORCE, rightJetAngle);
+                });
+            } else {
+                rightResidual.strength = Math.max(0, rightResidual.strength - 0.1);
+            }
+
+            if (leftJetActive && rightJetActive) {
+                injectCentralUpflow(CENTRAL_UPFLOW_STRENGTH);
+            }
+
+            rings.forEach(ring => {
+                ring.applyResidualForce(leftResidual.x, leftResidual.y, leftResidual.strength);
+                ring.applyResidualForce(rightResidual.x, rightResidual.y, rightResidual.strength);
+                ring.update();
+            });
+
+            // Actualizar partículas de agua 2D
+            for (let i = waterParticles.length - 1; i >= 0; i--) {
+                const particle = waterParticles[i];
+                particle.update();
+
+                if (particle.life <= 0) {
+                    waterParticles.splice(i, 1);
+                }
+            }
+
+            // Actualizar efectos 3D
+            updateWaterSurface();
+            updateWaterParticleSystem();
+
+            // *** ACTUALIZAR COLORES DE PALOS BASADO EN NÚMERO DE AROS ***
+            for (let i = 0; i < poles3D.length; i++) {
+                poles3D[i].updateColorBasedOnRings(i);
+            }
+
+            // Renderizar la escena
+            renderer.render(scene, camera);
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Event listeners para teclado (PC)
+        document.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+        });
+
+        document.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+
+        // Event listeners para botones (móvil y PC)
+        function setupButtonEvents() {
+            // Botones de PC
+            const desktopButtons = document.querySelectorAll('.desktop-left, .desktop-right');
+            desktopButtons.forEach(button => {
+                const key = button.textContent.trim().toLowerCase();
+                
+                button.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    keys[key] = true;
+                    keys[key.toUpperCase()] = true;
+                });
+                
+                button.addEventListener('mouseup', (e) => {
+                    e.preventDefault();
+                    keys[key] = false;
+                    keys[key.toUpperCase()] = false;
+                });
+                
+                button.addEventListener('mouseleave', (e) => {
+                    keys[key] = false;
+                    keys[key.toUpperCase()] = false;
+                });
+            });
+
+            // Botones móviles
+            const mobileButtons = document.querySelectorAll('.mobile-button');
+            mobileButtons.forEach(button => {
+                const key = button.getAttribute('data-key');
+                
+                // Touch events para móvil
+                button.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    keys[key] = true;
+                    keys[key.toUpperCase()] = true;
+                    button.style.transform = 'translateY(2px) scale(0.95)';
+                });
+                
+                button.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    keys[key] = false;
+                    keys[key.toUpperCase()] = false;
+                    button.style.transform = '';
+                });
+                
+                button.addEventListener('touchcancel', (e) => {
+                    e.preventDefault();
+                    keys[key] = false;
+                    keys[key.toUpperCase()] = false;
+                    button.style.transform = '';
+                });
+                
+                // Mouse events como fallback
+                button.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    keys[key] = true;
+                    keys[key.toUpperCase()] = true;
+                    button.style.transform = 'translateY(2px) scale(0.95)';
+                });
+                
+                button.addEventListener('mouseup', (e) => {
+                    e.preventDefault();
+                    keys[key] = false;
+                    keys[key.toUpperCase()] = false;
+                    button.style.transform = '';
+                });
+                
+                button.addEventListener('mouseleave', (e) => {
+                    keys[key] = false;
+                    keys[key.toUpperCase()] = false;
+                    button.style.transform = '';
+                });
+            });
+        }
+
+        // Agregar nuevos aros periódicamente (máximo 10 aros totales)
+        setInterval(() => {
+            const totalRings = rings.length;
+            const freeRings = rings.filter(ring => !ring.onPole).length;
+            
+            // Solo agregar aros si tenemos menos de 10 en total y menos de 4 libres
+            if (totalRings < 10 && freeRings < 4) {
+                const colors = [0xFFF200, 0x00B6FF, 0x00FF21, 0xFF0000, 0xFF8300];
+                rings.push(new Ring(
+                    Math.random() * (CANVAS_WIDTH - 100) + 50,
+                    CANVAS_HEIGHT - 25, // Muy cerca del fondo
+                    colors[Math.floor(Math.random() * colors.length)]
+                ));
+            }
+        }, 5000);
+
+        // Nota: El control de redimensionamiento ahora se maneja en makeCanvasResponsive()
+
+        // Iniciar el juego
+        init();
+        gameLoop();
+    </script>
+</body>
+</html>
