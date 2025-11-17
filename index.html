@@ -2,7 +2,11 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, minimum-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-touch-fullscreen" content="yes">
     <title>Water Ring Toss 3D</title>
     <style>
         body {
@@ -294,7 +298,7 @@
             }
 
             .mobile-controls {
-                gap: 50px;
+                gap: 100px;
             }
         }
 
@@ -319,7 +323,19 @@
         /* Mejoras para toques en móvil */
         .mobile-button {
             -webkit-tap-highlight-color: transparent;
-            touch-action: manipulation;
+            touch-action: none; /* Permite multi-touch simultáneo */
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: rgba(0,0,0,0);
+        }
+
+        /* Asegurar multi-touch en el contenedor de botones móviles */
+        .mobile-controls {
+            touch-action: none;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
         }
 
         /* Indicador visual de botón presionado */
@@ -372,11 +388,11 @@
 
         <!-- Contenedor de botones para móvil -->
         <div class="mobile-controls">
-            <button class="frutiger-aero-button mobile-button" data-key="s">
-                S
+            <button class="frutiger-aero-button mobile-button" data-key="s" aria-label="Izquierda">
+                &rarr;
             </button>
-            <button class="frutiger-aero-button mobile-button" data-key="l">
-                L
+            <button class="frutiger-aero-button mobile-button" data-key="l" aria-label="Derecha">
+                &larr;
             </button>
         </div>
     </div>
@@ -1623,14 +1639,25 @@
                 const dy = this.y - waterY;
                 const distance = Math.sqrt(dx * dx + dy * dy);
 
-                if (distance < WATER_RADIUS && distance > 0) {
-                    const strength = (WATER_RADIUS - distance) / WATER_RADIUS;
+                // *** DETERMINAR SI ES UN VECTOR HACIA EL CENTRO ***
+                const centerX = CANVAS_WIDTH / 2;
+                const centerY = CANVAS_HEIGHT / 2;
+                const angleToCenter = Math.atan2(centerY - waterY, centerX - waterX);
+                const angleDiff = Math.abs(angle - angleToCenter);
+                const isTowardCenter = angleDiff < 0.5 || Math.abs(angleDiff - Math.PI * 2) < 0.5;
+
+                // *** USAR RADIO MÁS AMPLIO PARA VECTORES HACIA EL CENTRO ***
+                const effectiveRadius = isTowardCenter ? WATER_RADIUS * 2.5 : WATER_RADIUS; // 2.5x radio para vector central
+                const forceMultiplier = isTowardCenter ? 0.35 : 0.15; // Más fuerza para vector central
+
+                if (distance < effectiveRadius && distance > 0) {
+                    const strength = (effectiveRadius - distance) / effectiveRadius;
                     
                     const forceX = Math.cos(angle) * force * strength;
                     const forceY = Math.sin(angle) * force * strength;
 
-                    this.vx += forceX * 0.15;
-                    this.vy += forceY * 0.15;
+                    this.vx += forceX * forceMultiplier;
+                    this.vy += forceY * forceMultiplier;
 
                     // Mantener Z bloqueado
                     this.vz = 0;
@@ -2028,6 +2055,17 @@
             const cosAngle = Math.cos(angle);
             const sinAngle = Math.sin(angle);
             
+            // *** DETECTAR SI ES UN VECTOR HACIA EL CENTRO ***
+            const centerX = CANVAS_WIDTH / 2;
+            const centerY = CANVAS_HEIGHT / 2;
+            const angleToCenter = Math.atan2(centerY - emitterY, centerX - emitterX);
+            const angleDiff = Math.abs(angle - angleToCenter);
+            const isTowardCenter = angleDiff < 0.5 || Math.abs(angleDiff - Math.PI * 2) < 0.5;
+            
+            // *** USAR PARÁMETROS EXPANDIDOS PARA VECTORES HACIA EL CENTRO ***
+            const effectiveConeAngle = isTowardCenter ? CONE_ANGLE * 2.0 : CONE_ANGLE; // Cono 2x más amplio
+            const effectiveReach = isTowardCenter ? REACH * 1.3 : REACH; // Alcance 30% mayor
+            
             for (let gy = 0; gy < GRID_ROWS; gy++) {
                 for (let gx = 0; gx < GRID_COLS; gx++) {
                     const cellPos = gridToCanvas(gx + 0.5, gy + 0.5);
@@ -2038,12 +2076,12 @@
                     if (distance === 0) continue;
                     
                     const cellAngle = Math.atan2(dy, dx);
-                    const angleDiff = Math.abs(cellAngle - angle);
-                    const normalizedAngleDiff = Math.min(angleDiff, 2 * Math.PI - angleDiff);
+                    const localAngleDiff = Math.abs(cellAngle - angle);
+                    const normalizedAngleDiff = Math.min(localAngleDiff, 2 * Math.PI - localAngleDiff);
                     
-                    if (normalizedAngleDiff <= CONE_ANGLE && distance <= REACH) {
-                        const distanceAttenuation = Math.exp(-distance / (REACH * 0.3));
-                        const angleAttenuation = Math.exp(-normalizedAngleDiff * normalizedAngleDiff / (CONE_ANGLE * CONE_ANGLE * 0.5));
+                    if (normalizedAngleDiff <= effectiveConeAngle && distance <= effectiveReach) {
+                        const distanceAttenuation = Math.exp(-distance / (effectiveReach * 0.3));
+                        const angleAttenuation = Math.exp(-normalizedAngleDiff * normalizedAngleDiff / (effectiveConeAngle * effectiveConeAngle * 0.5));
                         const intensity = strength * distanceAttenuation * angleAttenuation;
                         
                         velocityField[gy][gx].vx += cosAngle * intensity;
@@ -2140,11 +2178,15 @@
             }
         }
 
-        function createWaterJet(x, y, angle) {
-            for (let i = 0; i < 12; i++) {
+        function createWaterJet(x, y, angle, intensity = 1.0) {
+            // *** AJUSTAR NÚMERO DE PARTÍCULAS SEGÚN LA INTENSIDAD ***
+            const mainParticles = Math.floor(12 * intensity);
+            const secondaryParticles = Math.floor(6 * intensity);
+            
+            for (let i = 0; i < mainParticles; i++) {
                 const spread = (Math.random() - 0.5) * 0.8;
                 const jetAngle = angle + spread;
-                const speed = Math.random() * 4 + 3;
+                const speed = (Math.random() * 4 + 3) * intensity;
                 
                 waterParticles.push(new WaterParticle(
                     x + (Math.random() - 0.5) * 15,
@@ -2154,7 +2196,7 @@
                 ));
             }
             
-            for (let i = 0; i < 6; i++) {
+            for (let i = 0; i < secondaryParticles; i++) {
                 const distance = Math.random() * 100 + 50;
                 const spreadAngle = angle + (Math.random() - 0.5) * CONE_ANGLE * 2;
                 const px = x + Math.cos(spreadAngle) * distance;
@@ -2162,8 +2204,8 @@
                 
                 waterParticles.push(new WaterParticle(
                     px, py,
-                    Math.cos(spreadAngle) * (Math.random() + 0.5),
-                    Math.sin(spreadAngle) * (Math.random() + 0.5)
+                    Math.cos(spreadAngle) * (Math.random() + 0.5) * intensity,
+                    Math.sin(spreadAngle) * (Math.random() + 0.5) * intensity
                 ));
             }
         }
@@ -2224,6 +2266,17 @@
 
         // Inicializar el juego
         function init() {
+            // *** CONFIGURACIÓN GLOBAL PARA MULTI-TOUCH EN iOS ***
+            // Permitir múltiples toques simultáneos
+            document.addEventListener('touchstart', function() {}, { passive: false });
+            document.addEventListener('touchmove', function(e) {
+                // Solo prevenir si el toque está en los botones de juego
+                if (e.target.classList.contains('mobile-button') || 
+                    e.target.closest('.mobile-controls')) {
+                    e.preventDefault();
+                }
+            }, { passive: false });
+            
             // Configurar eventos de botones primero
             setupButtonEvents();
             
@@ -2270,6 +2323,14 @@
             
             const leftJetAngle = -Math.PI / 4;
             const rightJetAngle = -3 * Math.PI / 4;
+            
+            // *** ÁNGULOS HACIA EL CENTRO PARA EVITAR ATORAMIENTOS ***
+            const centerX = CANVAS_WIDTH / 2;
+            const centerY = CANVAS_HEIGHT / 2;
+            
+            // Calcular ángulos hacia el centro desde cada boquilla
+            const leftToCenterAngle = Math.atan2(centerY - leftJetY, centerX - leftJetX);
+            const rightToCenterAngle = Math.atan2(centerY - rightJetY, centerX - rightJetX);
 
             const prevLeftActive = leftJetActive;
             const prevRightActive = rightJetActive;
@@ -2295,12 +2356,21 @@
             if (leftJetActive) {
                 if (!prevLeftActive) lastActivationTime.left = currentTime;
                 createWaterJet(leftJetX, leftJetY, leftJetAngle);
+                // *** CREAR PARTÍCULAS PARA EL CHORRO HACIA EL CENTRO ***
+                createWaterJet(leftJetX, leftJetY, leftToCenterAngle, 1.0); // Aumentado de 0.6 a 1.0 para mejor visibilidad
                 leftResidual.strength = Math.min(RESIDUAL_FORCE, leftResidual.strength + 0.5);
                 
+                // *** VECTOR PRINCIPAL EN 45 GRADOS ***
                 injectVelocity(leftJetX, leftJetY, leftJetAngle, INJECT_STRENGTH);
+                
+                // *** VECTOR SECUNDARIO HACIA EL CENTRO (MAYOR INTENSIDAD) ***
+                const centerForceStrength = INJECT_STRENGTH * 0.2; // Aumentado de 0.3 a 0.8 (80% de la fuerza principal)
+                injectVelocity(leftJetX, leftJetY, leftToCenterAngle, centerForceStrength);
                 
                 rings.forEach(ring => {
                     ring.applyWaterForce(leftJetX, leftJetY, WATER_FORCE, leftJetAngle);
+                    // Aplicar fuerza adicional hacia el centro con mayor intensidad
+                    ring.applyWaterForce(leftJetX, leftJetY, WATER_FORCE * 0.4, leftToCenterAngle); // Aumentado de 0.4 a 0.9
                 });
             } else {
                 leftResidual.strength = Math.max(0, leftResidual.strength - 0.1);
@@ -2309,12 +2379,21 @@
             if (rightJetActive) {
                 if (!prevRightActive) lastActivationTime.right = currentTime;
                 createWaterJet(rightJetX, rightJetY, rightJetAngle);
+                // *** CREAR PARTÍCULAS PARA EL CHORRO HACIA EL CENTRO ***
+                createWaterJet(rightJetX, rightJetY, rightToCenterAngle, 1.0); // Aumentado de 0.6 a 1.0 para mejor visibilidad
                 rightResidual.strength = Math.min(RESIDUAL_FORCE, rightResidual.strength + 0.5);
                 
+                // *** VECTOR PRINCIPAL EN 45 GRADOS ***
                 injectVelocity(rightJetX, rightJetY, rightJetAngle, INJECT_STRENGTH);
+                
+                // *** VECTOR SECUNDARIO HACIA EL CENTRO (MAYOR INTENSIDAD) ***
+                const centerForceStrength = INJECT_STRENGTH * 0.2; // Aumentado de 0.3 a 0.8 (80% de la fuerza principal)
+                injectVelocity(rightJetX, rightJetY, rightToCenterAngle, centerForceStrength);
                 
                 rings.forEach(ring => {
                     ring.applyWaterForce(rightJetX, rightJetY, WATER_FORCE, rightJetAngle);
+                    // Aplicar fuerza adicional hacia el centro con mayor intensidad
+                    ring.applyWaterForce(rightJetX, rightJetY, WATER_FORCE * 0.4, rightToCenterAngle); // Aumentado de 0.4 a 0.9
                 });
             } else {
                 rightResidual.strength = Math.max(0, rightResidual.strength - 0.1);
@@ -2400,7 +2479,120 @@
                 console.log(`Tecla "${key}" establecida a: ${isPressed}`);
             }
 
-            // Botones de PC
+            // *** CONFIGURACIÓN MEJORADA PARA MULTI-TOUCH EN iOS ***
+            
+            // Botones móviles con manejo mejorado de multi-touch
+            const mobileButtons = document.querySelectorAll('.mobile-button');
+            console.log('Botones móviles encontrados:', mobileButtons.length);
+            
+            // Array para rastrear toques activos
+            const activeTouches = new Map();
+            
+            mobileButtons.forEach((button, index) => {
+                const key = button.getAttribute('data-key');
+                console.log(`Configurando botón móvil ${index + 1}: tecla "${key}"`);
+                
+                // *** EVENTOS TÁCTILES MEJORADOS PARA MULTI-TOUCH ***
+                button.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    // Registrar todos los toques que comienzan en este botón
+                    for (let i = 0; i < e.changedTouches.length; i++) {
+                        const touch = e.changedTouches[i];
+                        activeTouches.set(touch.identifier, { button, key });
+                    }
+                    
+                    console.log(`Botón móvil touched: ${key}, toques activos:`, activeTouches.size);
+                    setKeyState(key, true, button);
+                }, { passive: false });
+                
+                button.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    // Remover toques que terminan
+                    let stillHasTouchOnThisButton = false;
+                    
+                    for (let i = 0; i < e.changedTouches.length; i++) {
+                        const touch = e.changedTouches[i];
+                        activeTouches.delete(touch.identifier);
+                    }
+                    
+                    // Verificar si todavía hay toques activos en este botón
+                    activeTouches.forEach((touchInfo) => {
+                        if (touchInfo.button === button) {
+                            stillHasTouchOnThisButton = true;
+                        }
+                    });
+                    
+                    if (!stillHasTouchOnThisButton) {
+                        console.log(`Botón móvil release: ${key}, toques activos:`, activeTouches.size);
+                        setKeyState(key, false, button);
+                    }
+                }, { passive: false });
+                
+                button.addEventListener('touchcancel', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    // Limpiar toques cancelados
+                    for (let i = 0; i < e.changedTouches.length; i++) {
+                        const touch = e.changedTouches[i];
+                        activeTouches.delete(touch.identifier);
+                    }
+                    
+                    console.log(`Botón móvil cancelled: ${key}, toques activos:`, activeTouches.size);
+                    setKeyState(key, false, button);
+                }, { passive: false });
+                
+                // Manejar toques que se mueven fuera del botón
+                button.addEventListener('touchmove', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    // Verificar si algún toque se movió fuera del botón
+                    for (let i = 0; i < e.changedTouches.length; i++) {
+                        const touch = e.changedTouches[i];
+                        const touchInfo = activeTouches.get(touch.identifier);
+                        
+                        if (touchInfo && touchInfo.button === button) {
+                            const rect = button.getBoundingClientRect();
+                            const x = touch.clientX;
+                            const y = touch.clientY;
+                            
+                            // Si el toque está fuera del botón, considerarlo como liberado
+                            if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+                                activeTouches.delete(touch.identifier);
+                                
+                                // Verificar si todavía hay otros toques en este botón
+                                let stillHasTouchOnThisButton = false;
+                                activeTouches.forEach((ti) => {
+                                    if (ti.button === button) {
+                                        stillHasTouchOnThisButton = true;
+                                    }
+                                });
+                                
+                                if (!stillHasTouchOnThisButton) {
+                                    console.log(`Toque salió del botón móvil: ${key}`);
+                                    setKeyState(key, false, button);
+                                }
+                            }
+                        }
+                    }
+                }, { passive: false });
+                
+                // Prevenir arrastre y selección
+                button.addEventListener('dragstart', (e) => {
+                    e.preventDefault();
+                });
+                
+                button.addEventListener('selectstart', (e) => {
+                    e.preventDefault();
+                });
+            });
+
+            // Botones de PC (sin cambios)
             const desktopButtons = document.querySelectorAll('.desktop-left, .desktop-right');
             console.log('Botones de PC encontrados:', desktopButtons.length);
             
@@ -2422,57 +2614,6 @@
                 
                 button.addEventListener('mouseleave', (e) => {
                     console.log(`Mouse salió del botón PC: ${key}`);
-                    setKeyState(key, false, button);
-                });
-
-                // Prevenir arrastre
-                button.addEventListener('dragstart', (e) => {
-                    e.preventDefault();
-                });
-            });
-
-            // Botones móviles
-            const mobileButtons = document.querySelectorAll('.mobile-button');
-            console.log('Botones móviles encontrados:', mobileButtons.length);
-            
-            mobileButtons.forEach((button, index) => {
-                const key = button.getAttribute('data-key');
-                console.log(`Configurando botón móvil ${index + 1}: tecla "${key}"`);
-                
-                // Touch events para móvil
-                button.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    console.log(`Botón móvil touched: ${key}`);
-                    setKeyState(key, true, button);
-                });
-                
-                button.addEventListener('touchend', (e) => {
-                    e.preventDefault();
-                    console.log(`Botón móvil release: ${key}`);
-                    setKeyState(key, false, button);
-                });
-                
-                button.addEventListener('touchcancel', (e) => {
-                    e.preventDefault();
-                    console.log(`Botón móvil cancelled: ${key}`);
-                    setKeyState(key, false, button);
-                });
-                
-                // Mouse events como fallback
-                button.addEventListener('mousedown', (e) => {
-                    e.preventDefault();
-                    console.log(`Botón móvil mouse down: ${key}`);
-                    setKeyState(key, true, button);
-                });
-                
-                button.addEventListener('mouseup', (e) => {
-                    e.preventDefault();
-                    console.log(`Botón móvil mouse up: ${key}`);
-                    setKeyState(key, false, button);
-                });
-                
-                button.addEventListener('mouseleave', (e) => {
-                    console.log(`Mouse salió del botón móvil: ${key}`);
                     setKeyState(key, false, button);
                 });
 
