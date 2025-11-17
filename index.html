@@ -474,15 +474,20 @@
         // Variables del juego (mantenidas exactas)
         let score = 0;
         let keys = {};
-        // Variables para el control de jets
+        // Variables para el control de jets con fuerza variable
         let waterParticles = [];
         let rings = [];
         let poles = [];
         let leftJetActive = false;
         let rightJetActive = false;
-        let leftJetCooldown = false;  // Nuevo: sistema de cooldown
-        let rightJetCooldown = false; // Nuevo: sistema de cooldown
-        let jetDuration = 500;        // Duración del chorro en milisegundos
+        let leftJetCooldown = false;  // Sistema de cooldown
+        let rightJetCooldown = false; // Sistema de cooldown
+        let leftJetStartTime = 0;     // Tiempo cuando comenzó la presión
+        let rightJetStartTime = 0;    // Tiempo cuando comenzó la presión
+        let leftJetPressure = 0;      // Fuerza actual del jet izquierdo (0-1)
+        let rightJetPressure = 0;     // Fuerza actual del jet derecho (0-1)
+        let maxJetDuration = 1000;    // Duración máxima de presión (2 segundos)
+        let minJetDuration = 100;     // Duración mínima para activación (0.1 segundos)
         let jetCooldownTime = 200;    // Tiempo de cooldown en milisegundos
         let leftResidual = { strength: 0, x: 0, y: CANVAS_HEIGHT };
         let rightResidual = { strength: 0, x: CANVAS_WIDTH, y: CANVAS_HEIGHT };
@@ -2350,7 +2355,10 @@
             const prevLeftActive = leftJetActive;
             const prevRightActive = rightJetActive;
             // *** REMOVER CONTROL POR TECLAS - AHORA SE CONTROLA DIRECTAMENTE ***
-            // leftJetActive y rightJetActive se controlan directamente en activateJet()
+            // leftJetActive y rightJetActive se controlan directamente en startJetPressure()
+            
+            // *** ACTUALIZAR PRESIÓN DE JETS EN TIEMPO REAL ***
+            updateJetPressure();
 
             // Debug: mostrar estado de los jets cada segundo
             if (currentTime % 1000 < 16.67) {
@@ -2358,32 +2366,38 @@
                     leftJetActive,
                     rightJetActive,
                     leftJetCooldown,
-                    rightJetCooldown
+                    rightJetCooldown,
+                    leftJetPressure: leftJetPressure.toFixed(2),
+                    rightJetPressure: rightJetPressure.toFixed(2)
                 });
             }
 
-            // Actualizar efectos de boquillas
-            jetNozzles[0].material.emissive.setHex(leftJetActive ? 0x00FFFF : 0x000000);
-            jetNozzles[1].material.emissive.setHex(rightJetActive ? 0x00FFFF : 0x000000);
+            // Actualizar efectos de boquillas con intensidad basada en presión
+            const leftIntensity = leftJetActive ? 0.3 + (leftJetPressure * 0.7) : 0;
+            const rightIntensity = rightJetActive ? 0.3 + (rightJetPressure * 0.7) : 0;
+            
+            jetNozzles[0].material.emissive.setRGB(0, leftIntensity, leftIntensity);
+            jetNozzles[1].material.emissive.setRGB(0, rightIntensity, rightIntensity);
 
             if (leftJetActive) {
                 if (!prevLeftActive) lastActivationTime.left = currentTime;
-                createWaterJet(leftJetX, leftJetY, leftJetAngle);
-                // *** CREAR PARTÍCULAS PARA EL CHORRO HACIA EL CENTRO ***
-                createWaterJet(leftJetX, leftJetY, leftToCenterAngle, 1.0); // Aumentado de 0.6 a 1.0 para mejor visibilidad
-                leftResidual.strength = Math.min(RESIDUAL_FORCE, leftResidual.strength + 0.5);
                 
-                // *** VECTOR PRINCIPAL EN 45 GRADOS ***
-                injectVelocity(leftJetX, leftJetY, leftJetAngle, INJECT_STRENGTH);
+                // *** CREAR PARTÍCULAS CON INTENSIDAD BASADA EN PRESIÓN ***
+                const pressureMultiplier = 0.5 + (leftJetPressure * 0.5); // 50%-100% de intensidad
+                createWaterJet(leftJetX, leftJetY, leftJetAngle, pressureMultiplier);
+                createWaterJet(leftJetX, leftJetY, leftToCenterAngle, pressureMultiplier);
                 
-                // *** VECTOR SECUNDARIO HACIA EL CENTRO (MAYOR INTENSIDAD) ***
-                const centerForceStrength = INJECT_STRENGTH * 0.2; // Aumentado de 0.3 a 0.8 (80% de la fuerza principal)
+                leftResidual.strength = Math.min(RESIDUAL_FORCE * pressureMultiplier, leftResidual.strength + (0.5 * pressureMultiplier));
+                
+                // *** INYECTAR VELOCIDAD CON FUERZA VARIABLE ***
+                injectVelocity(leftJetX, leftJetY, leftJetAngle, INJECT_STRENGTH * pressureMultiplier);
+                const centerForceStrength = INJECT_STRENGTH * 0.2 * pressureMultiplier;
                 injectVelocity(leftJetX, leftJetY, leftToCenterAngle, centerForceStrength);
                 
+                // *** APLICAR FUERZA A ANILLOS CON PRESIÓN VARIABLE ***
                 rings.forEach(ring => {
-                    ring.applyWaterForce(leftJetX, leftJetY, WATER_FORCE, leftJetAngle);
-                    // Aplicar fuerza adicional hacia el centro con mayor intensidad
-                    ring.applyWaterForce(leftJetX, leftJetY, WATER_FORCE * 0.4, leftToCenterAngle); // Aumentado de 0.4 a 0.9
+                    ring.applyWaterForce(leftJetX, leftJetY, WATER_FORCE * pressureMultiplier, leftJetAngle);
+                    ring.applyWaterForce(leftJetX, leftJetY, WATER_FORCE * 0.4 * pressureMultiplier, leftToCenterAngle);
                 });
             } else {
                 leftResidual.strength = Math.max(0, leftResidual.strength - 0.1);
@@ -2391,22 +2405,23 @@
 
             if (rightJetActive) {
                 if (!prevRightActive) lastActivationTime.right = currentTime;
-                createWaterJet(rightJetX, rightJetY, rightJetAngle);
-                // *** CREAR PARTÍCULAS PARA EL CHORRO HACIA EL CENTRO ***
-                createWaterJet(rightJetX, rightJetY, rightToCenterAngle, 1.0); // Aumentado de 0.6 a 1.0 para mejor visibilidad
-                rightResidual.strength = Math.min(RESIDUAL_FORCE, rightResidual.strength + 0.5);
                 
-                // *** VECTOR PRINCIPAL EN 45 GRADOS ***
-                injectVelocity(rightJetX, rightJetY, rightJetAngle, INJECT_STRENGTH);
+                // *** CREAR PARTÍCULAS CON INTENSIDAD BASADA EN PRESIÓN ***
+                const pressureMultiplier = 0.5 + (rightJetPressure * 0.5); // 50%-100% de intensidad
+                createWaterJet(rightJetX, rightJetY, rightJetAngle, pressureMultiplier);
+                createWaterJet(rightJetX, rightJetY, rightToCenterAngle, pressureMultiplier);
                 
-                // *** VECTOR SECUNDARIO HACIA EL CENTRO (MAYOR INTENSIDAD) ***
-                const centerForceStrength = INJECT_STRENGTH * 0.2; // Aumentado de 0.3 a 0.8 (80% de la fuerza principal)
+                rightResidual.strength = Math.min(RESIDUAL_FORCE * pressureMultiplier, rightResidual.strength + (0.5 * pressureMultiplier));
+                
+                // *** INYECTAR VELOCIDAD CON FUERZA VARIABLE ***
+                injectVelocity(rightJetX, rightJetY, rightJetAngle, INJECT_STRENGTH * pressureMultiplier);
+                const centerForceStrength = INJECT_STRENGTH * 0.2 * pressureMultiplier;
                 injectVelocity(rightJetX, rightJetY, rightToCenterAngle, centerForceStrength);
                 
+                // *** APLICAR FUERZA A ANILLOS CON PRESIÓN VARIABLE ***
                 rings.forEach(ring => {
-                    ring.applyWaterForce(rightJetX, rightJetY, WATER_FORCE, rightJetAngle);
-                    // Aplicar fuerza adicional hacia el centro con mayor intensidad
-                    ring.applyWaterForce(rightJetX, rightJetY, WATER_FORCE * 0.4, rightToCenterAngle); // Aumentado de 0.4 a 0.9
+                    ring.applyWaterForce(rightJetX, rightJetY, WATER_FORCE * pressureMultiplier, rightJetAngle);
+                    ring.applyWaterForce(rightJetX, rightJetY, WATER_FORCE * 0.4 * pressureMultiplier, rightToCenterAngle);
                 });
             } else {
                 rightResidual.strength = Math.max(0, rightResidual.strength - 0.1);
@@ -2450,7 +2465,7 @@
         // *** VARIABLES PARA RASTREO DE TECLAS PRESIONADAS ***
         let keysPressed = new Set();
 
-        // Event listeners para teclado (PC) - SISTEMA ACTUALIZADO
+        // Event listeners para teclado (PC) - SISTEMA DE PRESIÓN ACTUALIZADO
         document.addEventListener('keydown', (e) => {
             console.log(`Tecla presionada: "${e.key}"`);
             
@@ -2458,18 +2473,17 @@
             if (e.key.toLowerCase() === 'f' || e.key.toLowerCase() === 'j') {
                 e.preventDefault();
                 
-                // Solo activar si la tecla no estaba ya presionada (evitar repetición)
+                // Solo iniciar presión si la tecla no estaba ya presionada (evitar repetición)
                 if (!keysPressed.has(e.key.toLowerCase())) {
                     keysPressed.add(e.key.toLowerCase());
                     
-                    if (e.key.toLowerCase() === 'f' && !leftJetCooldown) {
-                        // Buscar el botón correspondiente para feedback visual
-                        const leftButton = document.querySelector('[data-key="f"]');
-                        activateJet('left', leftButton);
-                    } else if (e.key.toLowerCase() === 'j' && !rightJetCooldown) {
-                        // Buscar el botón correspondiente para feedback visual
-                        const rightButton = document.querySelector('[data-key="j"]');
-                        activateJet('right', rightButton);
+                    // Buscar el botón correspondiente para feedback visual
+                    const side = e.key.toLowerCase() === 'f' ? 'left' : 'right';
+                    const button = document.querySelector(`[data-key="${e.key.toLowerCase()}"]`);
+                    
+                    const success = startJetPressure(side, button);
+                    if (success) {
+                        console.log(`Teclado - presión iniciada: ${e.key.toLowerCase()} (${side})`);
                     }
                 }
             }
@@ -2485,33 +2499,63 @@
             if (e.key.toLowerCase() === 'f' || e.key.toLowerCase() === 'j') {
                 e.preventDefault();
                 
-                // Remover del conjunto de teclas presionadas
-                keysPressed.delete(e.key.toLowerCase());
+                // Solo terminar presión si la tecla estaba presionada
+                if (keysPressed.has(e.key.toLowerCase())) {
+                    keysPressed.delete(e.key.toLowerCase());
+                    
+                    // Buscar el botón correspondiente para feedback visual
+                    const side = e.key.toLowerCase() === 'f' ? 'left' : 'right';
+                    const button = document.querySelector(`[data-key="${e.key.toLowerCase()}"]`);
+                    
+                    endJetPressure(side, button);
+                    console.log(`Teclado - presión terminada: ${e.key.toLowerCase()} (${side})`);
+                }
             }
             
             // Mantener el sistema legacy de teclas para otros usos
             keys[e.key] = false;
         });
 
-        // *** FUNCIÓN GLOBAL PARA ACTIVAR JETS TEMPORALMENTE ***
+        // *** FUNCIONES GLOBALES PARA CONTROL DE JETS CON FUERZA VARIABLE ***
         
-        // Función para activar un jet temporalmente
-        function activateJet(side, button = null) {
+        // Función para iniciar la presión de un jet
+        function startJetPressure(side, button = null) {
             // Verificar si el jet está en cooldown
             if ((side === 'left' && leftJetCooldown) || (side === 'right' && rightJetCooldown)) {
                 console.log(`Jet ${side} está en cooldown, ignorando activación`);
-                return;
+                return false;
             }
             
-            console.log(`Activando jet ${side} temporalmente`);
+            console.log(`Iniciando presión del jet ${side}`);
+            const currentTime = Date.now();
             
-            // Activar el jet
+            // Activar el jet e inicializar variables
             if (side === 'left') {
+                if (leftJetActive) return false; // Ya está activo
                 leftJetActive = true;
-                leftJetCooldown = true;
+                leftJetStartTime = currentTime;
+                leftJetPressure = 0;
+                
+                // *** PROGRAMAR DESACTIVACIÓN AUTOMÁTICA DESPUÉS DEL TIEMPO MÁXIMO ***
+                setTimeout(() => {
+                    if (leftJetActive) { // Solo desactivar si sigue activo
+                        console.log(`Jet ${side} desactivado automáticamente después de ${maxJetDuration}ms`);
+                        endJetPressure(side, button);
+                    }
+                }, maxJetDuration);
             } else {
+                if (rightJetActive) return false; // Ya está activo
                 rightJetActive = true;
-                rightJetCooldown = true;
+                rightJetStartTime = currentTime;
+                rightJetPressure = 0;
+                
+                // *** PROGRAMAR DESACTIVACIÓN AUTOMÁTICA DESPUÉS DEL TIEMPO MÁXIMO ***
+                setTimeout(() => {
+                    if (rightJetActive) { // Solo desactivar si sigue activo
+                        console.log(`Jet ${side} desactivado automáticamente después de ${maxJetDuration}ms`);
+                        endJetPressure(side, button);
+                    }
+                }, maxJetDuration);
             }
             
             // Feedback visual inmediato
@@ -2521,34 +2565,172 @@
                 button.classList.add('jet-active');
             }
             
-            // Desactivar el jet después de la duración especificada
-            setTimeout(() => {
-                if (side === 'left') {
-                    leftJetActive = false;
-                } else {
-                    rightJetActive = false;
-                }
-                
-                // Remover feedback visual
-                if (button) {
-                    button.style.transform = '';
-                    button.style.boxShadow = '';
-                    button.classList.remove('jet-active');
-                }
-                
-                console.log(`Jet ${side} desactivado`);
-            }, jetDuration);
+            return true;
+        }
+        
+        // Función para terminar la presión de un jet
+        function endJetPressure(side, button = null) {
+            // Verificar si el jet está activo
+            if ((side === 'left' && !leftJetActive) || (side === 'right' && !rightJetActive)) {
+                console.log(`Jet ${side} no está activo`);
+                return;
+            }
             
-            // Terminar el cooldown después del tiempo especificado
+            const currentTime = Date.now();
+            let pressDuration;
+            
+            if (side === 'left') {
+                pressDuration = currentTime - leftJetStartTime;
+                leftJetActive = false;
+                leftJetPressure = 0;
+                leftJetCooldown = true;
+            } else {
+                pressDuration = currentTime - rightJetStartTime;
+                rightJetActive = false;
+                rightJetPressure = 0;
+                rightJetCooldown = true;
+            }
+            
+            // Solo activar si se presionó por tiempo mínimo
+            if (pressDuration >= minJetDuration) {
+                // Calcular fuerza basada en duración (0-1)
+                const normalizedDuration = Math.min(pressDuration / maxJetDuration, 1.0);
+                const finalPressure = Math.max(0.2, normalizedDuration); // Mínimo 20% de fuerza
+                
+                console.log(`Jet ${side} - Duración: ${pressDuration}ms, Fuerza: ${(finalPressure * 100).toFixed(1)}%`);
+                
+                // Aplicar fuerza a los anillos inmediatamente
+                applyJetForceToRings(side, finalPressure);
+                
+                // Crear partículas visuales proporcionales a la fuerza
+                createJetBurst(side, finalPressure);
+            } else {
+                console.log(`Jet ${side} - Presión muy corta (${pressDuration}ms), no activado`);
+            }
+            
+            // Remover feedback visual
+            if (button) {
+                button.style.transform = '';
+                button.style.boxShadow = '';
+                button.style.filter = ''; // Limpiar el filtro de brillo
+                button.classList.remove('jet-active');
+            }
+            
+            // Iniciar cooldown
             setTimeout(() => {
                 if (side === 'left') {
                     leftJetCooldown = false;
                 } else {
                     rightJetCooldown = false;
                 }
-                
                 console.log(`Cooldown del jet ${side} terminado`);
-            }, jetDuration + jetCooldownTime);
+            }, jetCooldownTime);
+        }
+        
+        // Función para aplicar fuerza del jet a los anillos
+        function applyJetForceToRings(side, pressure) {
+            const jetX = side === 'left' ? 50 : CANVAS_WIDTH - 50;
+            const jetY = CANVAS_HEIGHT - 50;
+            const forceMultiplier = pressure * 1.5; // Multiplicador de fuerza
+            
+            rings.forEach(ring => {
+                if (ring.onPole || ring.slidingOnPole) return;
+                
+                const dx = ring.x - jetX;
+                const dy = ring.y - jetY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < WATER_RADIUS * (1 + pressure * 0.5)) { // Radio variable
+                    const force = (WATER_FORCE * forceMultiplier) / (distance + 1);
+                    const angle = Math.atan2(dy, dx);
+                    
+                    ring.vx += Math.cos(angle) * force;
+                    ring.vy += Math.sin(angle) * force;
+                    
+                    // Rotación extra basada en fuerza
+                    ring.rotationSpeed += (Math.random() - 0.5) * 0.1 * pressure;
+                }
+            });
+        }
+        
+        // Función para crear explosión visual del jet
+        function createJetBurst(side, pressure) {
+            const jetX = side === 'left' ? 50 : CANVAS_WIDTH - 50;
+            const jetY = CANVAS_HEIGHT - 50;
+            const particleCount = Math.floor(10 + pressure * 20); // 10-30 partículas
+            
+            for (let i = 0; i < particleCount; i++) {
+                const angle = (side === 'left' ? -Math.PI/3 : -2*Math.PI/3) + (Math.random() - 0.5) * Math.PI/3;
+                const speed = 3 + pressure * 7; // Velocidad variable
+                
+                const vx = Math.cos(angle) * speed;
+                const vy = Math.sin(angle) * speed;
+                
+                // *** USAR LA CLASE WaterParticle CORRECTA ***
+                const particle = new WaterParticle(
+                    jetX + (Math.random() - 0.5) * 20,
+                    jetY + (Math.random() - 0.5) * 20,
+                    vx,
+                    vy
+                );
+                
+                // Ajustar propiedades basadas en la presión
+                particle.life = 1.0;
+                particle.size = 3 + pressure * 4;
+                
+                waterParticles.push(particle);
+            }
+        }
+        
+        // Función para actualizar la presión en tiempo real
+        function updateJetPressure() {
+            const currentTime = Date.now();
+            
+            if (leftJetActive) {
+                const duration = currentTime - leftJetStartTime;
+                leftJetPressure = Math.min(duration / maxJetDuration, 1.0);
+                
+                // *** FEEDBACK VISUAL DE PRESIÓN EN BOTÓN CON INDICADOR DE LÍMITE ***
+                const leftButton = document.querySelector('[data-key="f"]');
+                if (leftButton) {
+                    const intensity = 0.5 + (leftJetPressure * 0.5); // 50%-100%
+                    const scale = 0.95 + (leftJetPressure * 0.05); // 95%-100%
+                    
+                    // *** CAMBIO DE COLOR CUANDO SE ACERCA AL MÁXIMO ***
+                    if (leftJetPressure >= 0.9) {
+                        // Parpadeo rápido cuando está cerca del límite
+                        const pulseEffect = Math.sin(currentTime * 0.02) * 0.2 + 0.8;
+                        leftButton.style.filter = `brightness(${intensity + 0.5}) hue-rotate(${leftJetPressure * 60}deg)`;
+                        leftButton.style.transform = `translateY(2px) scale(${scale * pulseEffect})`;
+                    } else {
+                        leftButton.style.transform = `translateY(2px) scale(${scale})`;
+                        leftButton.style.filter = `brightness(${intensity + 0.3})`;
+                    }
+                }
+            }
+            
+            if (rightJetActive) {
+                const duration = currentTime - rightJetStartTime;
+                rightJetPressure = Math.min(duration / maxJetDuration, 1.0);
+                
+                // *** FEEDBACK VISUAL DE PRESIÓN EN BOTÓN CON INDICADOR DE LÍMITE ***
+                const rightButton = document.querySelector('[data-key="j"]');
+                if (rightButton) {
+                    const intensity = 0.5 + (rightJetPressure * 0.5); // 50%-100%
+                    const scale = 0.95 + (rightJetPressure * 0.05); // 95%-100%
+                    
+                    // *** CAMBIO DE COLOR CUANDO SE ACERCA AL MÁXIMO ***
+                    if (rightJetPressure >= 0.9) {
+                        // Parpadeo rápido cuando está cerca del límite
+                        const pulseEffect = Math.sin(currentTime * 0.02) * 0.2 + 0.8;
+                        rightButton.style.filter = `brightness(${intensity + 0.5}) hue-rotate(${rightJetPressure * 60}deg)`;
+                        rightButton.style.transform = `translateY(2px) scale(${scale * pulseEffect})`;
+                    } else {
+                        rightButton.style.transform = `translateY(2px) scale(${scale})`;
+                        rightButton.style.filter = `brightness(${intensity + 0.3})`;
+                    }
+                }
+            }
         }
 
         // Event listeners para botones (móvil y PC)
@@ -2557,13 +2739,12 @@
             
             // Función legacy para mantener compatibilidad con teclado
             function setKeyState(key, isPressed, button = null) {
-                // Para el nuevo sistema, solo activamos en el momento del press
-                if (isPressed && !keys[key]) { // Solo activar si no estaba ya presionado
-                    if ((key === 'f' || key === 'F') && !leftJetCooldown) {
-                        activateJet('left', button);
-                    } else if ((key === 'j' || key === 'J') && !rightJetCooldown) {
-                        activateJet('right', button);
-                    }
+                if (isPressed && !keys[key]) { // Solo iniciar si no estaba ya presionado
+                    const side = (key === 'f' || key === 'F') ? 'left' : 'right';
+                    startJetPressure(side, button);
+                } else if (!isPressed && keys[key]) { // Solo terminar si estaba presionado
+                    const side = (key === 'f' || key === 'F') ? 'left' : 'right';
+                    endJetPressure(side, button);
                 }
                 
                 // Mantener el estado de las teclas para otros usos potenciales
@@ -2574,9 +2755,9 @@
                 console.log(`Tecla "${key}" establecida a: ${isPressed}`);
             }
 
-            // *** CONFIGURACIÓN SIMPLIFICADA PARA ACTIVACIÓN ÚNICA ***
+            // *** CONFIGURACIÓN PARA PRESIÓN VARIABLE ***
             
-            // Botones móviles con activación por tap único
+            // Botones móviles con control de presión por tiempo
             const mobileButtons = document.querySelectorAll('.mobile-button');
             console.log('Botones móviles encontrados:', mobileButtons.length);
             
@@ -2584,32 +2765,60 @@
                 const key = button.getAttribute('data-key');
                 console.log(`Configurando botón móvil ${index + 1}: tecla "${key}"`);
                 
-                // *** EVENTO TÁCTIL ÚNICO PARA ACTIVACIÓN ***
+                // *** EVENTOS TÁCTILES PARA CONTROL DE PRESIÓN ***
                 button.addEventListener('touchstart', (e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     
-                    // Activar jet inmediatamente al tocar
+                    // Iniciar presión del jet
                     const side = key === 'f' ? 'left' : 'right';
-                    activateJet(side, button);
+                    const success = startJetPressure(side, button);
                     
-                    console.log(`Botón móvil activado: ${key} (${side})`);
+                    if (success) {
+                        console.log(`Botón móvil presión iniciada: ${key} (${side})`);
+                    }
                 }, { passive: false });
                 
-                // Prevenir otros eventos táctiles innecesarios
                 button.addEventListener('touchend', (e) => {
                     e.preventDefault();
                     e.stopPropagation();
+                    
+                    // Terminar presión del jet
+                    const side = key === 'f' ? 'left' : 'right';
+                    endJetPressure(side, button);
+                    
+                    console.log(`Botón móvil presión terminada: ${key} (${side})`);
                 }, { passive: false });
                 
                 button.addEventListener('touchcancel', (e) => {
                     e.preventDefault();
                     e.stopPropagation();
+                    
+                    // Cancelar presión del jet
+                    const side = key === 'f' ? 'left' : 'right';
+                    endJetPressure(side, button);
+                    
+                    console.log(`Botón móvil presión cancelada: ${key} (${side})`);
                 }, { passive: false });
                 
                 button.addEventListener('touchmove', (e) => {
                     e.preventDefault();
                     e.stopPropagation();
+                    
+                    // Verificar si el toque salió del botón
+                    const touch = e.touches[0];
+                    if (touch) {
+                        const rect = button.getBoundingClientRect();
+                        const x = touch.clientX;
+                        const y = touch.clientY;
+                        
+                        if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+                            // Toque salió del botón, terminar presión
+                            const side = key === 'f' ? 'left' : 'right';
+                            endJetPressure(side, button);
+                            console.log(`Toque salió del botón móvil: ${key} (${side})`);
+                        }
+                    }
                 }, { passive: false });
                 
                 // Prevenir arrastre y selección
@@ -2622,7 +2831,7 @@
                 });
             });
 
-            // Botones de PC con activación única por clic
+            // Botones de PC con control de presión por tiempo
             const desktopButtons = document.querySelectorAll('.desktop-left, .desktop-right');
             console.log('Botones de PC encontrados:', desktopButtons.length);
             
@@ -2630,36 +2839,41 @@
                 const key = button.getAttribute('data-key') || button.textContent.trim().toLowerCase();
                 console.log(`Configurando botón PC ${index + 1}: tecla "${key}"`);
                 
-                // *** EVENTO DE CLIC ÚNICO PARA ACTIVACIÓN ***
-                button.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    console.log(`Botón PC clickeado: ${key}`);
-                    
-                    // Activar jet inmediatamente al hacer clic
-                    const side = key === 'f' ? 'left' : 'right';
-                    activateJet(side, button);
-                });
-                
-                // Mantener feedback visual básico para mousedown/up (sin activar jets)
+                // *** EVENTOS DE MOUSE PARA CONTROL DE PRESIÓN ***
                 button.addEventListener('mousedown', (e) => {
                     e.preventDefault();
-                    // Solo feedback visual, sin activar jets
-                    button.style.transform = 'translateY(1px) scale(0.98)';
+                    console.log(`Botón PC presión iniciada: ${key}`);
+                    
+                    // Iniciar presión del jet
+                    const side = key === 'f' ? 'left' : 'right';
+                    const success = startJetPressure(side, button);
+                    
+                    if (!success) {
+                        // Solo feedback visual si no se pudo activar el jet (cooldown)
+                        button.style.transform = 'translateY(1px) scale(0.98)';
+                    }
                 });
                 
                 button.addEventListener('mouseup', (e) => {
                     e.preventDefault();
-                    // Restaurar solo si no hay jet activo
-                    if ((key === 'f' && !leftJetActive) || (key === 'j' && !rightJetActive)) {
-                        button.style.transform = '';
-                    }
+                    console.log(`Botón PC presión terminada: ${key}`);
+                    
+                    // Terminar presión del jet
+                    const side = key === 'f' ? 'left' : 'right';
+                    endJetPressure(side, button);
                 });
                 
                 button.addEventListener('mouseleave', (e) => {
-                    // Restaurar solo si no hay jet activo
-                    if ((key === 'f' && !leftJetActive) || (key === 'j' && !rightJetActive)) {
-                        button.style.transform = '';
+                    console.log(`Mouse salió del botón PC: ${key}`);
+                    
+                    // Terminar presión del jet si estaba activo
+                    const side = key === 'f' ? 'left' : 'right';
+                    if ((side === 'left' && leftJetActive) || (side === 'right' && rightJetActive)) {
+                        endJetPressure(side, button);
                     }
+                    
+                    // Restaurar estado visual
+                    button.style.transform = '';
                 });
 
                 // Prevenir arrastre
