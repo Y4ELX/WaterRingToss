@@ -11,16 +11,12 @@
     <style>
         body {
             margin: 0;
-            padding: 0;
-            background: linear-gradient(180deg, #3390b5 0%, #164469 100%);
-            font-family: 'Arial', sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
-            color: white;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-            overflow-x: auto;
+            background-color: #252ab9;
+            box-shadow: inset 4px 4px 20px #090581, inset -4px -4px 20px #4867ff;
+            color: #4d4d4d;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.2s ease-in-out;
         }
 
         h1 {
@@ -40,8 +36,8 @@
         }
 
         #gameContainer {
-            border: 4px solid #fff;
-            border-radius: 10px;
+            border-radius: 20px;
+            box-shadow: 4px 4px 20px #191595, -4px -4px 20px #4867ff;
             background: #000;
             overflow: hidden;
             z-index: 100;
@@ -174,15 +170,16 @@
         }
 
         .frutiger-aero-button {
-            /* OKLCH Color System for accurate colors */
-            --hue: 245;
-            --sat: 0.2;
+            /* Hexadecimal Color System */
+            --main-color: #E8E14B;
+            --main-color-dark: #B8B239;
+            --main-color-light: #F5F178;
             --glow-intensity: 0.7;
             
             /* Color Variables */
-            --fg: oklch(15% calc(var(--sat) * 0.5) var(--hue));
-            --bg: oklch(75% var(--sat) var(--hue) / 0.8);
-            --bg-dark: oklch(45% var(--sat) var(--hue) / 0.75);
+            --fg: #1a1a1a;
+            --bg: #e8cb4b;
+            --bg-dark: #B8B239;
             --bottom-glow: radial-gradient(
                 farthest-corner at bottom center,
                 rgba(255, 255, 255, var(--glow-intensity)),
@@ -195,17 +192,17 @@
                 var(--bottom-glow),
                 linear-gradient(to bottom, var(--bg-dark), var(--bg));
             
-            border: 1px solid var(--bg);
+            border: 1px solid var(--bg-dark);
             border-radius: 50%;
             
             /* Shadows and Effects */
             box-shadow: 0 4px 4px rgba(0, 0, 0, 0.4);
             
             /* Typography */
-            color: white;
+            color: #b79a16;
             font-family: "Lucida Grande", "Lucida Sans Unicode", "Segoe UI", system-ui, sans-serif;
             font-weight: 700;
-            text-shadow: 0 2px 0.5em rgba(0, 0, 0, 0.2);
+            text-shadow: 0 1px 1px rgba(255, 255, 255, 0.3);
             
             /* Layout */
             cursor: pointer;
@@ -283,8 +280,8 @@
         /* Ajustes adicionales para pantallas muy pequeñas */
         @media (max-width: 480px) {
             .frutiger-aero-button {
-                width: 70px;
-                height: 70px;
+                width: 100px;
+                height: 100px;
                 font-size: 25px;
             }
 
@@ -345,27 +342,40 @@
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
         }
 
-        /* Estado activo para los jets */
-        .frutiger-aero-button.jet-active {
-            background: 
-                radial-gradient(farthest-corner at bottom center, rgba(0, 255, 255, 0.8), transparent),
-                linear-gradient(to bottom, oklch(45% var(--sat) var(--hue) / 0.75), oklch(75% var(--sat) var(--hue) / 0.8));
-            box-shadow: 0 4px 12px rgba(0, 255, 255, 0.4);
-            animation: pulse-glow 0.5s ease-in-out infinite alternate;
-        }
+/* Estado activo para los jets (AMARILLO D8CE1B) */
+.frutiger-aero-button.jet-active {
+    background: 
+        radial-gradient(
+            farthest-corner at bottom center,
+            rgba(255, 255, 255, 0.9),
+            transparent
+        ),
+        /* Degradado amarillo brillante */
+        linear-gradient(
+            to bottom,
+            #f0e27a,  /* Amarillo más claro */
+            #d8b51b   /* Amarillo principal */
+        );
 
-        @keyframes pulse-glow {
-            from { box-shadow: 0 4px 12px rgba(0, 255, 255, 0.4); }
-            to { box-shadow: 0 6px 18px rgba(0, 255, 255, 0.7); }
-        }
+    /* Sombra reactiva al color */
+    box-shadow: 0 4px 12px rgba(216, 206, 27, 0.6);
+    animation: pulse-glow 0.5s ease-in-out infinite alternate;
+}
+
+.minimalButton {
+    width: 50px;
+    height: 50px;
+    font-size: 20px;
+}
+
 
     </style>
 </head>
 <body>
     <div class="mainContainer">
         <!-- Botón izquierdo para PC -->
-        <button class="frutiger-aero-button desktop-left" data-key="s">
-            S
+        <button class="frutiger-aero-button desktop-left" data-key="f">
+            F
         </button>
 
         <div id="gameContainer" style="position: relative; width: 800px; height: 600px; margin: 0">
@@ -382,16 +392,16 @@
         </div>
 
         <!-- Botón derecho para PC -->
-        <button class="frutiger-aero-button desktop-right" data-key="l">
-            L
+        <button class="frutiger-aero-button desktop-right" data-key="j">
+            J
         </button>
 
         <!-- Contenedor de botones para móvil -->
         <div class="mobile-controls">
-            <button class="frutiger-aero-button mobile-button" data-key="s" aria-label="Izquierda">
+            <button class="frutiger-aero-button mobile-button" data-key="f" aria-label="Izquierda">
                 &rarr;
             </button>
-            <button class="frutiger-aero-button mobile-button" data-key="l" aria-label="Derecha">
+            <button class="frutiger-aero-button mobile-button" data-key="j" aria-label="Derecha">
                 &larr;
             </button>
         </div>
@@ -2334,16 +2344,16 @@
 
             const prevLeftActive = leftJetActive;
             const prevRightActive = rightJetActive;
-            leftJetActive = keys['s'] || keys['S'];
-            rightJetActive = keys['l'] || keys['L'];
+            leftJetActive = keys['f'] || keys['F'];
+            rightJetActive = keys['j'] || keys['J'];
 
             // Debug: mostrar estado de las teclas cada segundo
             if (currentTime % 1000 < 16.67) {
                 console.log('Estado de teclas:', {
-                    's': keys['s'],
-                    'S': keys['S'], 
-                    'l': keys['l'],
-                    'L': keys['L'],
+                    'j': keys['j'],
+                    'J': keys['J'], 
+                    'f': keys['f'],
+                    'F': keys['F'],
                     leftJetActive,
                     rightJetActive
                 });
@@ -2438,8 +2448,8 @@
         document.addEventListener('keydown', (e) => {
             console.log(`Tecla presionada: "${e.key}"`);
             keys[e.key] = true;
-            // Prevenir comportamiento por defecto para S y L
-            if (e.key.toLowerCase() === 's' || e.key.toLowerCase() === 'l') {
+            // Prevenir comportamiento por defecto para F y J
+            if (e.key.toLowerCase() === 'f' || e.key.toLowerCase() === 'j') {
                 e.preventDefault();
             }
         });
@@ -2447,8 +2457,8 @@
         document.addEventListener('keyup', (e) => {
             console.log(`Tecla liberada: "${e.key}"`);
             keys[e.key] = false;
-            // Prevenir comportamiento por defecto para S y L
-            if (e.key.toLowerCase() === 's' || e.key.toLowerCase() === 'l') {
+            // Prevenir comportamiento por defecto para F y J
+            if (e.key.toLowerCase() === 'f' || e.key.toLowerCase() === 'j') {
                 e.preventDefault();
             }
         });
